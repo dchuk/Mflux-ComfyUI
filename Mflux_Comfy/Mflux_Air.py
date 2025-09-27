@@ -1,16 +1,37 @@
 import os
 import json
-from pathlib import Path 
-from huggingface_hub import snapshot_download
-from folder_paths import get_filename_list, get_output_directory, models_dir
-try:
-    from mflux.flux.flux import Flux1  # type: ignore
-except Exception as e:
-    raise ImportError("[MFlux-ComfyUI] mflux>=0.10.0 is required. Activate your ComfyUI venv and install with: pip install 'mflux==0.10.0'") from e
 
 try:
-    from mflux.config.model_config import ModelConfig  # type: ignore
+    from huggingface_hub import snapshot_download
 except Exception:
+    snapshot_download = None  # type: ignore[assignment]
+from folder_paths import get_filename_list, get_output_directory, models_dir
+
+_skip_mflux_import = os.environ.get("MFLUX_COMFY_DISABLE_MFLUX_IMPORT") == "1"
+
+if not _skip_mflux_import:
+    try:
+        from mflux.flux.flux import Flux1  # type: ignore
+    except Exception as e:
+        raise ImportError("[MFlux-ComfyUI] mflux>=0.10.0 is required. Activate your ComfyUI venv and install with: pip install 'mflux==0.10.0'") from e
+else:
+    class Flux1:  # type: ignore
+        def __init__(self, *_, **__):
+            raise RuntimeError("mflux runtime disabled (MFLUX_COMFY_DISABLE_MFLUX_IMPORT=1).")
+
+        @classmethod
+        def from_name(cls, *_, **__):
+            raise RuntimeError("mflux runtime disabled (MFLUX_COMFY_DISABLE_MFLUX_IMPORT=1).")
+
+        def save_model(self, *_, **__):
+            raise RuntimeError("mflux runtime disabled (MFLUX_COMFY_DISABLE_MFLUX_IMPORT=1).")
+
+if not _skip_mflux_import:
+    try:
+        from mflux.config.model_config import ModelConfig  # type: ignore
+    except Exception:
+        ModelConfig = None  # type: ignore
+else:
     ModelConfig = None  # type: ignore
 
 from .Mflux_Core import get_lora_info, generate_image, save_images_with_metadata, is_third_party_model, infer_quant_bits
@@ -96,6 +117,12 @@ def _materialize_builtin_model(model_version: str, target_dir: str):
         raise RuntimeError(f"Failed to save built-in model {model_version}: {e}") from e
 
 def download_hg_model(model_version, force_redownload=False):
+    if snapshot_download is None:
+        raise RuntimeError(
+            "huggingface_hub is required for model downloads. "
+            "Activate your ComfyUI virtual environment and install it with: "
+            "pip install 'huggingface_hub>=0.24'"
+        )
     # If a slash is present, treat it as a full HF repo id; otherwise keep legacy mapping
     repo_id = model_version if "/" in model_version else (f"madroid/{model_version}" if "4bit" in model_version else f"AITRADER/{model_version}")
     model_checkpoint = get_full_model_path(mflux_dir, model_version)  

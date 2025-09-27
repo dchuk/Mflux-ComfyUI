@@ -1,24 +1,68 @@
 import random
 import json
 import os
+from importlib import import_module
 import numpy as np
 import torch
-from tqdm import tqdm
 from PIL import Image
 from PIL.PngImagePlugin import PngInfo
 import comfy.utils as utils
 import folder_paths
 
-try:
-    import mlx.core as mx  # type: ignore
-except Exception:
-    mx = None  # noqa: N816
+_skip_mlx_import = os.environ.get("MFLUX_COMFY_DISABLE_MLX_IMPORT") == "1"
+_skip_mflux_import = os.environ.get("MFLUX_COMFY_DISABLE_MFLUX_IMPORT") == "1"
+_skip_controlnet_import = os.environ.get("MFLUX_COMFY_DISABLE_CONTROLNET_IMPORT") == "1"
 
-try:
-    from mflux.flux.flux import Flux1  # type: ignore
-    from mflux.config.config import Config  # type: ignore
-except Exception as e:
-    raise ImportError("[MFlux-ComfyUI] mflux>=0.10.0 is required. Activate your ComfyUI venv and install with: pip install 'mflux==0.10.0'") from e
+DEFAULT_CONTROLNET_MODELS = [
+    "InstantX/FLUX.1-dev-Controlnet-Canny",
+    "jasperai/Flux.1-dev-Controlnet-Upscaler",
+]
+
+if not _skip_mlx_import:
+    try:
+        import mlx.core as mx  # type: ignore
+    except Exception:
+        mx = None  # noqa: N816
+else:
+    mx = None  # type: ignore
+
+if not _skip_mflux_import:
+    try:
+        from mflux.flux.flux import Flux1  # type: ignore
+        from mflux.config.config import Config  # type: ignore
+    except Exception as e:
+        raise ImportError(
+            "[MFlux-ComfyUI] mflux>=0.10.0 is required. Activate your ComfyUI venv and install with: pip install 'mflux==0.10.0'"
+        ) from e
+else:
+    class _DisabledFlux:  # type: ignore
+        def __init__(self, *_, **__):
+            raise RuntimeError(
+                "mflux runtime disabled (MFLUX_COMFY_DISABLE_MFLUX_IMPORT=1)."
+            )
+
+        @classmethod
+        def from_name(cls, *_, **__):
+            raise RuntimeError(
+                "mflux runtime disabled (MFLUX_COMFY_DISABLE_MFLUX_IMPORT=1)."
+            )
+
+        def generate_image(self, *_, **__):
+            raise RuntimeError(
+                "mflux runtime disabled (MFLUX_COMFY_DISABLE_MFLUX_IMPORT=1)."
+            )
+
+        def save_model(self, *_, **__):
+            raise RuntimeError(
+                "mflux runtime disabled (MFLUX_COMFY_DISABLE_MFLUX_IMPORT=1)."
+            )
+
+    class _StubConfig(dict):
+        def __init__(self, **kwargs):
+            super().__init__(**kwargs)
+
+    Flux1 = _DisabledFlux  # type: ignore
+    Config = _StubConfig  # type: ignore
 
 # ModelConfig is optional in some mflux builds; handle gracefully
 try:
@@ -26,7 +70,40 @@ try:
 except Exception:
     ModelConfig = None  # type: ignore
 
+
+def get_available_controlnet_models() -> list[str]:
+    """Return known ControlNet model repo IDs, falling back to defaults.
+
+    Attempts to read mflux's AVAILABLE_MODELS so the dropdown reflects
+    whatever the runtime supports. When the runtime is unavailable (e.g. in
+    tests or during startup without optional deps), we keep the historical
+    default list to avoid blocking node registration.
+    """
+
+    # Quick escape when imports are intentionally disabled
+    if _skip_mflux_import or ModelConfig is None:
+        return DEFAULT_CONTROLNET_MODELS.copy()
+
+    try:
+        model_cfg = import_module("mflux.config.model_config")
+        available = getattr(model_cfg, "AVAILABLE_MODELS", {})
+    except Exception:
+        return DEFAULT_CONTROLNET_MODELS.copy()
+
+    models: list[str] = []
+    try:
+        for cfg in available.values():
+            control_name = getattr(cfg, "controlnet_model", None)
+            if control_name and control_name not in models:
+                models.append(control_name)
+    except Exception:
+        return DEFAULT_CONTROLNET_MODELS.copy()
+
+    return models or DEFAULT_CONTROLNET_MODELS.copy()
+
 try:
+    if _skip_controlnet_import:
+        raise ImportError("ControlNet import disabled via env")
     from mflux.controlnet.controlnet_util import ControlnetUtil  # type: ignore
     # Some mflux builds lack helpers; fall back to local implementation in that case
     if not hasattr(ControlnetUtil, "preprocess_canny") or not hasattr(ControlnetUtil, "scale_image"):
@@ -69,6 +146,11 @@ def warn_if_mlx_old():
     and warns if the version is older than 0.27.0.
     """
     global _printed_mlx_info
+    if _skip_mlx_import:
+        if not _printed_mlx_info:
+            print("[MFlux-ComfyUI] MLX import skipped (MFLUX_COMFY_DISABLE_MLX_IMPORT=1).")
+            _printed_mlx_info = True
+        return
     try:
         ver = None
         try:

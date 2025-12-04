@@ -1,6 +1,6 @@
 try:
     # Normal package import when executed as a package by ComfyUI
-    from .Mflux_Comfy.Mflux_Air import QuickMfluxNode, MfluxModelsLoader, MfluxModelsDownloader, MfluxCustomModels
+    from .Mflux_Comfy.Mflux_Air import QuickMfluxNode, MfluxModelsLoader, MfluxModelsDownloader, MfluxCustomModels, MfluxZImageNode
     from .Mflux_Comfy.Mflux_Pro import MfluxImg2Img, MfluxLorasLoader, MfluxControlNetLoader, MfluxUpscale
 except Exception:
     # Fallback for environments where relative imports fail (e.g., direct execution during tests).
@@ -12,11 +12,12 @@ except Exception:
         sys.path.insert(0, pkg_root)
     if comfy_root not in sys.path:
         sys.path.insert(0, comfy_root)
-    from Mflux_Comfy.Mflux_Air import QuickMfluxNode, MfluxModelsLoader, MfluxModelsDownloader, MfluxCustomModels
+    from Mflux_Comfy.Mflux_Air import QuickMfluxNode, MfluxModelsLoader, MfluxModelsDownloader, MfluxCustomModels, MfluxZImageNode
     from Mflux_Comfy.Mflux_Pro import MfluxImg2Img, MfluxLorasLoader, MfluxControlNetLoader, MfluxUpscale
 
 NODE_CLASS_MAPPINGS = {
     "QuickMfluxNode": QuickMfluxNode,
+    "MfluxZImageNode": MfluxZImageNode,
     "MfluxModelsLoader": MfluxModelsLoader,
     "MfluxModelsDownloader": MfluxModelsDownloader,
     "MfluxCustomModels": MfluxCustomModels,
@@ -28,6 +29,7 @@ NODE_CLASS_MAPPINGS = {
 
 NODE_DISPLAY_NAME_MAPPINGS = {
     "QuickMfluxNode": "Quick MFlux Generation",
+    "MfluxZImageNode": "MFlux Z-Image Turbo",
     "MfluxModelsLoader": "MFlux Models Loader",
     "MfluxModelsDownloader": "MFlux Models Downloader",
     "MfluxCustomModels": "MFlux Custom Models",

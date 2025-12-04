@@ -146,12 +146,7 @@ class QuickMfluxNode:
         return {
             "required": {
                 "prompt": ("STRING", {"multiline": True, "dynamicPrompts": True, "default": "Luxury food photograph"}),
-                "model": ([
-                    "dev",
-                    "schnell",
-                    "z-image-turbo",
-                    "filipstrand/Z-Image-Turbo-mflux-4bit"
-                ], {"default": "schnell"}),
+                "model": (["dev", "schnell"], {"default": "schnell"}),
                 "quantize": (["None", "3", "4", "5", "6", "8"], {"default": "8"}),
                 "seed": ("INT", {"default": -1, "min": -1, "max": 0xffffffffffffffff}),
                 "width": ("INT", {"default": 512, "min": 256, "max": 2048, "step": 8}),
@@ -186,11 +181,6 @@ class QuickMfluxNode:
         final_width, final_height = width, height
         final_steps, final_guidance = steps, guidance
         final_seed = -1 if randomize_seed else seed
-
-        # Z-Image Turbo specific defaults if not overridden by presets
-        if "z-image" in str(model).lower():
-            print(f"[MFlux-ComfyUI] Z-Image Turbo selected. Recommended steps: 9. Current steps: {final_steps}")
-            # Note: We don't force override steps here to respect user input, but we log it.
 
         generated_images = generate_image(
             prompt, model, final_seed, final_width, final_height, final_steps, final_guidance, quantize, metadata,
@@ -240,6 +230,86 @@ class QuickMfluxNode:
                 base_model=base_model,
                 vae_tiling=vae_tiling,
                 vae_tiling_split=vae_tiling_split
+            )
+
+        return generated_images
+
+class MfluxZImageNode:
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "prompt": ("STRING", {"multiline": True, "dynamicPrompts": True, "default": "A cinematic shot of..."}),
+                "model": ([
+                    "filipstrand/Z-Image-Turbo-mflux-4bit",
+                    "Tongyi-MAI/Z-Image-Turbo",
+                ], {"default": "filipstrand/Z-Image-Turbo-mflux-4bit"}),
+                "seed": ("INT", {"default": -1, "min": -1, "max": 0xffffffffffffffff}),
+                "width": ("INT", {"default": 1024, "min": 256, "max": 2048, "step": 16}),
+                "height": ("INT", {"default": 1024, "min": 256, "max": 2048, "step": 16}),
+                "steps": ("INT", {"default": 9, "min": 1, "max": 50, "tooltip": "Z-Image Turbo is optimized for 9 steps."}),
+                "metadata": ("BOOLEAN", {"default": True}),
+            },
+            "optional": {
+                "quantize": (["None", "4", "8"], {"default": "None", "tooltip": "Use '4' if loading the full model and want to save RAM. Leave 'None' for pre-quantized models."}),
+                "Local_model": ("PATH",),
+                "Loras": ("MfluxLorasPipeline",),
+                "img2img": ("MfluxImg2ImgPipeline",),
+            },
+            "hidden": {
+                "full_prompt": "PROMPT",
+                "extra_pnginfo": "EXTRA_PNGINFO"
+            }
+        }
+
+    RETURN_TYPES = ("IMAGE",)
+    CATEGORY = "MFlux/Air"
+    FUNCTION = "generate"
+
+    # Z-Image specific generation function
+    def generate(self, prompt, model, seed, width, height, steps, metadata=True, quantize="None", Local_model="", img2img=None, Loras=None, full_prompt=None, extra_pnginfo=None):
+
+        # Force guidance to 0 for Z-Image
+        guidance = 0.0
+
+        # If user selected the 4-bit model but didn't set quantize, force it to 4 to match the weights
+        if "4bit" in model and quantize == "None":
+            quantize = "4"
+
+        generated_images = generate_image(
+            prompt, model, seed, width, height, steps, guidance, quantize, metadata,
+            Local_model, img2img, Loras, ControlNet=None, base_model="dev", low_ram=False
+        )
+
+        if metadata:
+            image_path = img2img.image_path if img2img else None
+            image_strength = img2img.image_strength if img2img else None
+            lora_paths, lora_scales = get_lora_info(Loras)
+
+            quantize_effective = quantize
+            if Local_model:
+                detected = infer_quant_bits(Local_model)
+                if detected: quantize_effective = f"{detected}-bit"
+
+            save_images_with_metadata(
+                images=generated_images,
+                prompt=prompt,
+                model=model,
+                quantize=quantize,
+                quantize_effective=quantize_effective,
+                Local_model=Local_model,
+                seed=seed,
+                height=height,
+                width=width,
+                steps=steps,
+                guidance=guidance,
+                image_path=image_path,
+                image_strength=image_strength,
+                lora_paths=lora_paths,
+                lora_scales=lora_scales,
+                full_prompt=full_prompt,
+                extra_pnginfo=extra_pnginfo,
+                base_model="z-image" # Just for metadata reference
             )
 
         return generated_images

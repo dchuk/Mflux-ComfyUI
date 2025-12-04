@@ -1,15 +1,3 @@
-Yes, the `README.md` needs to be updated to reflect the **new dedicated node** we just created.
-
-Since we moved Z-Image support into its own node (`MFlux Z-Image Turbo`) to simplify the UI (hiding guidance/base_model), we should list it explicitly so users know to look for it instead of trying to configure the standard node.
-
-Here is the updated `README.md`.
-
-**Changes made:**
-1.  **Nodes Section**: Added **`MFlux Z-Image Turbo`** to the **MFlux/Air** list.
-2.  **Usage Tips**: Added a specific note about Z-Image settings (9 steps).
-3.  **Repo URL**: Reverted the git clone URL to `joonsoome` (consistent with our previous steps), but ensure this matches your actual fork name.
-
-```markdown
 <h1 align="center">Mflux-ComfyUI</h1>
 
 <p align="center">
@@ -115,4 +103,3 @@ If nodes appear red in ComfyUI, use the Manager's "Install Missing Custom Nodes"
 ## License
 
 MIT
-```

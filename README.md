@@ -1,3 +1,15 @@
+Yes, the `README.md` needs to be updated to reflect the **new dedicated node** we just created.
+
+Since we moved Z-Image support into its own node (`MFlux Z-Image Turbo`) to simplify the UI (hiding guidance/base_model), we should list it explicitly so users know to look for it instead of trying to configure the standard node.
+
+Here is the updated `README.md`.
+
+**Changes made:**
+1.  **Nodes Section**: Added **`MFlux Z-Image Turbo`** to the **MFlux/Air** list.
+2.  **Usage Tips**: Added a specific note about Z-Image settings (9 steps).
+3.  **Repo URL**: Reverted the git clone URL to `joonsoome` (consistent with our previous steps), but ensure this matches your actual fork name.
+
+```markdown
 <h1 align="center">Mflux-ComfyUI</h1>
 
 <p align="center">
@@ -7,7 +19,7 @@
 
 ## Overview
 
-This fork upgrades the original nodes to use **mflux 0.13.1** while keeping ComfyUI workflow compatibility. It leverages the new unified architecture of mflux 0.13.x to support standard FLUX generation as well as specialized variants like Fill, Depth, and Redux.
+This fork upgrades the original nodes to use **mflux 0.13.1** while keeping ComfyUI workflow compatibility. It leverages the new unified architecture of mflux 0.13.x to support standard FLUX generation as well as specialized variants like Fill, Depth, Redux, and Z-Image Turbo.
 
 - **Backend**: mflux 0.13.1 (requires macOS + Apple Silicon).
 - **Graph compatibility**: Legacy inputs are migrated internally so your old graphs still work.
@@ -15,13 +27,14 @@ This fork upgrades the original nodes to use **mflux 0.13.1** while keeping Comf
 
 ## What's New in mflux 0.13.1
 This version brings significant backend enhancements:
-- **Z-Image Turbo Support**: Support for the fast, distilled Z-Image variant optimized for speed.
+- **Z-Image Turbo Support**: Support for the fast, distilled Z-Image variant optimized for speed (6B parameters).
 - **FIBO VLM Quantization**: Support for quantized (3/4/5/6/8-bit) FIBO VLM commands (`inspire`/`refine`).
 - **Unified Architecture**: Improved resolution for models, LoRAs, and tokenizers.
 
 ## Key features
 
 - **Core Generation**: Quick text2img and img2img in one node (`QuickMfluxNode`).
+- **Z-Image Turbo**: Dedicated node for the new high-speed model (`MFlux Z-Image Turbo`).
 - **FLUX Tools Support**: Dedicated nodes for **Fill** (Inpainting), **Depth** (Structure guidance), and **Redux** (Image variation).
 - **ControlNet**: Canny preview and best‑effort conditioning; includes support for the **Upscaler** ControlNet.
 - **LoRA Support**: Unified LoRA pipeline (quantize must be 8 when applying LoRAs).
@@ -40,7 +53,7 @@ This version brings significant backend enhancements:
    ```
 2. Clone the repository:
    ```bash
-   git clone https://github.com/rurounigit/Mflux-ComfyUI.git
+   git clone https://github.com/joonsoome/Mflux-ComfyUI.git
    ```
 3. Activate your ComfyUI virtual environment and install dependencies:
    ```bash
@@ -58,7 +71,8 @@ This version brings significant backend enhancements:
 ## Nodes
 
 ### MFlux/Air (Standard)
-- **QuickMfluxNode**: The all-in-one node for txt2img, img2img, LoRA, and ControlNet.
+- **QuickMfluxNode**: The all-in-one node for standard FLUX txt2img, img2img, LoRA, and ControlNet.
+- **MFlux Z-Image Turbo**: Dedicated node for Z-Image generation (optimized defaults: 9 steps, no guidance).
 - **Mflux Models Loader**: Select local models from `models/Mflux`.
 - **Mflux Models Downloader**: Download quantized or full models directly from HuggingFace.
 - **Mflux Custom Models**: Compose and save custom quantized variants.
@@ -72,6 +86,7 @@ This version brings significant backend enhancements:
 
 ## Usage Tips
 
+- **Z-Image Turbo**: Use the dedicated node. It defaults to **9 steps** and **0 guidance** (required for this model).
 - **LoRA Compatibility**: LoRAs currently require the base model to be loaded with `quantize=8` (or None).
 - **Dimensions**: Width and Height should be multiples of 16 (automatically adjusted if needed).
 - **Guidance**:
@@ -100,3 +115,4 @@ If nodes appear red in ComfyUI, use the Manager's "Install Missing Custom Nodes"
 ## License
 
 MIT
+```

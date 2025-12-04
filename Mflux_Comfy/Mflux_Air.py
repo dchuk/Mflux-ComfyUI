@@ -45,6 +45,8 @@ class MfluxModelsDownloader:
                     "MFLUX.1-dev-8-bit",
                     "filipstrand/FLUX.1-Krea-dev-mflux-4bit",
                     "akx/FLUX.1-Kontext-dev-mflux-4bit",
+                    "Tongyi-MAI/Z-Image-Turbo",
+                    "filipstrand/Z-Image-Turbo-mflux-4bit",
                 ], {"default": "flux.1-schnell-mflux-4bit"}),
             },
             "optional": {
@@ -66,7 +68,7 @@ class MfluxCustomModels:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "model": (["dev", "schnell"], {"default": "schnell"}),
+                "model": (["dev", "schnell", "z-image-turbo"], {"default": "schnell"}),
                 "quantize": (["3", "4", "5", "6", "8"], {"default": "8"}),
             },
             "optional": {
@@ -144,7 +146,12 @@ class QuickMfluxNode:
         return {
             "required": {
                 "prompt": ("STRING", {"multiline": True, "dynamicPrompts": True, "default": "Luxury food photograph"}),
-                "model": (["dev", "schnell"], {"default": "schnell"}),
+                "model": ([
+                    "dev",
+                    "schnell",
+                    "z-image-turbo",
+                    "filipstrand/Z-Image-Turbo-mflux-4bit"
+                ], {"default": "schnell"}),
                 "quantize": (["None", "3", "4", "5", "6", "8"], {"default": "8"}),
                 "seed": ("INT", {"default": -1, "min": -1, "max": 0xffffffffffffffff}),
                 "width": ("INT", {"default": 512, "min": 256, "max": 2048, "step": 8}),
@@ -175,10 +182,15 @@ class QuickMfluxNode:
 
     def generate(self, prompt, model, seed, width, height, steps, guidance, quantize="None", metadata=True, Local_model="", img2img=None, Loras=None, ControlNet=None, base_model="dev", low_ram=False, full_prompt=None, extra_pnginfo=None, size_preset="Custom", apply_size_preset=True, quality_preset="Balanced (25 steps)", apply_quality_preset=True, randomize_seed=True, vae_tiling=False, vae_tiling_split="horizontal"):
 
-        # Apply presets logic (simplified for brevity, keep original logic if needed)
+        # Apply presets logic
         final_width, final_height = width, height
         final_steps, final_guidance = steps, guidance
         final_seed = -1 if randomize_seed else seed
+
+        # Z-Image Turbo specific defaults if not overridden by presets
+        if "z-image" in str(model).lower():
+            print(f"[MFlux-ComfyUI] Z-Image Turbo selected. Recommended steps: 9. Current steps: {final_steps}")
+            # Note: We don't force override steps here to respect user input, but we log it.
 
         generated_images = generate_image(
             prompt, model, final_seed, final_width, final_height, final_steps, final_guidance, quantize, metadata,

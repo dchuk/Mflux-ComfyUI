@@ -16,6 +16,7 @@ try:
     from mflux.models.flux.variants.fill.flux_fill import Flux1Fill
     from mflux.models.flux.variants.depth.flux_depth import Flux1Depth
     from mflux.models.flux.variants.redux.flux_redux import Flux1Redux
+    from mflux.models.z_image.variants.turbo.z_image_turbo import ZImageTurbo
 except ImportError as e:
     raise ImportError("[MFlux-ComfyUI] mflux>=0.13.1 is required. Please update requirements.") from e
 
@@ -33,7 +34,7 @@ def _get_mflux_version() -> str:
 
 def is_third_party_model(model_name: str) -> bool:
     """Check if the model name looks like a third-party HF repo."""
-    prefixes = ["filipstrand/", "akx/", "Freepik/", "shuttleai/"]
+    prefixes = ["filipstrand/", "akx/", "Freepik/", "shuttleai/", "Tongyi-MAI/"]
     return any(str(model_name).startswith(p) for p in prefixes)
 
 def infer_quant_bits(name: str | None) -> int | None:
@@ -89,7 +90,10 @@ def load_or_create_flux(model_name, quantize, path, lora_paths, lora_scales, var
         }
 
         # Instantiate the correct class
-        if variant == "fill":
+        if "z-image" in str(model_name).lower() or "z-image" in str(base_model).lower():
+             # Z-Image Turbo handling
+             flux = ZImageTurbo(model_config=model_config, **common_args)
+        elif variant == "fill":
             flux = Flux1Fill(model_config=model_config, **common_args)
         elif variant == "depth":
             flux = Flux1Depth(model_config=model_config, **common_args)
@@ -118,6 +122,12 @@ def generate_image(prompt, model, seed, width, height, steps, guidance, quantize
             model_resolved = "schnell"
         elif "dev" in str(Local_model).lower():
             model_resolved = "dev"
+        elif "z-image" in str(Local_model).lower():
+            model_resolved = "z-image-turbo"
+
+    # If user selected the specific 4-bit repo in the dropdown, ensure we treat it as z-image
+    if "z-image" in str(model).lower():
+        model_resolved = model # Pass the full repo name (e.g. filipstrand/...) to load_or_create_flux
 
     q_val = None if quantize in (None, "None") else int(quantize)
     lora_paths, lora_scales = get_lora_info(Loras)

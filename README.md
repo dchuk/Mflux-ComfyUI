@@ -1,4 +1,4 @@
-<h1 align="center">Mflux-ComfyUI (v2)</h1>
+<h1 align="center">Mflux-ComfyUI</h1>
 
 <p align="center">
     <strong>ComfyUI nodes for mflux 0.13.1 (Apple Silicon/MLX)</strong><br/>
@@ -7,105 +7,89 @@
 
 ## Overview
 
-This fork upgrades the original nodes to use **mflux 0.13.1** while keeping ComfyUI workflow compatibility (no graph rewiring required). It adds third‑party model support, richer quantization options, better LoRA handling, and a small MLX version hint in the UI.
+This fork upgrades the original nodes to use **mflux 0.13.1** while keeping ComfyUI workflow compatibility. It leverages the new unified architecture of mflux 0.13.x to support standard FLUX generation as well as specialized variants like Fill, Depth, and Redux.
 
-- Backend: **mflux 0.13.1 only** (legacy 0.10.x/0.4.1 runtimes not supported)
-- Graph compatibility: legacy inputs are migrated internally so your old graphs still work
-- OS/Accel: macOS + MLX (Apple Silicon). MLX >= 0.27.0 recommended
+- **Backend**: mflux 0.13.1 (requires macOS + Apple Silicon).
+- **Graph compatibility**: Legacy inputs are migrated internally so your old graphs still work.
+- **Unified Loading**: Seamlessly handles local paths, HuggingFace repo IDs, and predefined aliases (e.g., `dev`, `schnell`).
 
 ## Key features
 
-- Quick text2img and img2img in one node (MFlux/Air → QuickMfluxNode)
-- LoRA pipeline with validation (quantize must be 8 when applying LoRAs)
-- ControlNet Canny preview and best‑effort conditioning
-- Third‑party Hugging Face repo IDs (e.g., filipstrand/..., akx/...) with base_model selection
-- Quantization choices: None, 3, 4, 5, 6, 8 (default 8)
-- Metadata saving (PNG + JSON with both legacy and new fields)
+- **Core Generation**: Quick text2img and img2img in one node (`QuickMfluxNode`).
+- **FLUX Tools Support**: Dedicated nodes for **Fill** (Inpainting), **Depth** (Structure guidance), and **Redux** (Image variation).
+- **ControlNet**: Canny preview and best‑effort conditioning; includes support for the **Upscaler** ControlNet.
+- **LoRA Support**: Unified LoRA pipeline (quantize must be 8 when applying LoRAs).
+- **Quantization**: Rich options (None, 3, 4, 5, 6, 8-bit) for memory efficiency.
+- **Metadata**: Saves full generation metadata (PNG + JSON) compatible with mflux CLI tools.
 
 ## Installation
 
-Using ComfyUI-Manager (recommended):
+### Using ComfyUI-Manager (Recommended)
 - Search for “Mflux-ComfyUI” and install.
 
-Manual:
-1) cd /path/to/ComfyUI/custom_nodes
-2) git clone https://github.com/joonsoome/Mflux-ComfyUI.git
-3) Activate your ComfyUI venv and install mflux 0.13.1:
-     - pip install --upgrade pip wheel setuptools
-     - pip install 'mlx>=0.27.0' 'huggingface_hub>=0.26.0'
-     - pip install 'mflux==0.13.1'
-4) Restart ComfyUI
+### Manual Installation
+1. Navigate to your custom nodes directory:
+   ```bash
+   cd /path/to/ComfyUI/custom_nodes
+   ```
+2. Clone the repository:
+   ```bash
+   git clone https://github.com/joonsoome/Mflux-ComfyUI.git
+   ```
+3. Activate your ComfyUI virtual environment and install dependencies:
+   ```bash
+   # Example for standard venv
+   source /path/to/ComfyUI/venv/bin/activate
 
-Notes:
-- requirements.txt pins mflux==0.13.1
-- MLX < 0.27.0 will show a UI hint; upgrade is recommended for stability/perf
+   pip install --upgrade pip wheel setuptools
+   pip install 'mlx>=0.27.0' 'huggingface_hub>=0.26.0'
+   pip install 'mflux==0.13.1'
+   ```
+4. Restart ComfyUI.
 
-## Environment (macOS / zsh)
-
-If you use the repository's virtual environment, this project expects the venv at:
-
-    /Volumes/Macintosh\ HD2/ComfyUI/.venv
-
-Activate it in zsh with:
-
-```zsh
-# Use the exact venv path above
-source /Volumes/Macintosh\ HD2/ComfyUI/.venv/lib/activate
-
-# Or, when your environment has the typical layout:
-# source /Volumes/Macintosh\ HD2/ComfyUI/.venv/bin/activate
-```
+**Note**: `mflux 0.13.1` requires `mlx >= 0.27.0`. If you are on an older version, please upgrade.
 
 ## Nodes
 
-Under MFlux/Air:
-- QuickMfluxNode (txt2img/img2img/LoRA/ControlNet in one)
-- Mflux Models Loader (pick saved models under models/Mflux)
-- Mflux Models Downloader (fetch curated or third‑party models)
-- Mflux Custom Models (compose and save custom quantized variants)
+### MFlux/Air (Standard)
+- **QuickMfluxNode**: The all-in-one node for txt2img, img2img, LoRA, and ControlNet.
+- **Mflux Models Loader**: Select local models from `models/Mflux`.
+- **Mflux Models Downloader**: Download quantized or full models directly from HuggingFace.
+- **Mflux Custom Models**: Compose and save custom quantized variants.
 
-Under MFlux/Pro:
-- Mflux Img2Img
-- Mflux Loras Loader
-- Mflux ControlNet Loader
+### MFlux/Pro (Advanced)
+- **Mflux Fill**: FLUX.1-Fill support for inpainting and outpainting (requires mask).
+- **Mflux Depth**: FLUX.1-Depth support for structure-guided generation.
+- **Mflux Redux**: FLUX.1-Redux support for mixing image styles/structures.
+- **Mflux Upscale**: Image upscaling using the Flux ControlNet Upscaler.
+- **Mflux Img2Img / Loras / ControlNet**: Modular loaders for building custom pipelines.
 
-## Developer notes — additional nodes & tests
+## Usage Tips
 
-This fork also includes several Pro-phase nodes and unit tests that are not part of the upstream quick-start. They are intended for contributors and advanced users:
-
-- **MfluxUpscale** (MFlux/Pro): an upscaler node that accepts a ComfyUI `IMAGE` tensor as the preferred input and has backwards-compatible support for legacy file-selection widgets. The node writes a temporary PNG when an IMAGE tensor is provided and will save PNG + JSON metadata by default.
-- **MfluxFill, MfluxDepth, MfluxRedux** (MFlux/Pro): additional Flux tools (inpainting/fill, depth-conditioned generation, and redux/variations). These nodes forward phase-2 style config keys such as `masked_image_path`, `depth_image_path`, `redux_image_paths`, and `redux_image_strengths` to the core `generate_image` flow.
-
-Tests added in the `tests/` folder include unit-level tests that:
-
-- Verify parameter migration and metadata saving (`tests/test_metadata_contents.py`).
-- Exercise node-level behavior for Fill/Depth/Redux by spying on the `save_images_with_metadata` call (`tests/test_fill_node.py`, `tests/test_depth_node.py`, `tests/test_redux_node.py`).
-- Validate the `generate_image` TypeError fallback path used to remove unknown config keys (`tests/test_config_fallback.py`).
-- Contain upscale-specific internals tests for converting ComfyUI IMAGE tensors and preserving backwards-compatibility (`tests/test_upscale_internals.py`).
-
-If you plan to extend the pack with more Flux tools (Kontext, In-Context LoRA, CatVTON, Concept-Attention), the existing tests and `Mflux_Comfy/Mflux_Core.py` retry-on-TypeError pattern are useful blueprints for handling API drift across mflux versions.
-
-## Usage tips
-
-- LoRA + quantize < 8 is not supported → set quantize to 8 when using LoRAs
-- Width/Height should be multiples of 8
-- dev model respects guidance; schnell ignores guidance (safe to set)
-- Seed −1 randomizes each run. Presets are provided for size/quality.
-
-### Paths
-- Quantized models: ComfyUI/models/Mflux
-- LoRAs: ComfyUI/models/loras (tip: create models/loras/Mflux to keep them tidy)
-- Full models cache (HF): ~/Library/Caches/mflux (or system cache)
+- **LoRA Compatibility**: LoRAs currently require the base model to be loaded with `quantize=8` (or None).
+- **Dimensions**: Width and Height should be multiples of 16 (automatically adjusted if needed).
+- **Guidance**:
+  - `dev` models respect guidance (default ~3.5).
+  - `schnell` models ignore guidance (safe to leave as is).
+- **Paths**:
+  - Quantized models: `ComfyUI/models/Mflux`
+  - LoRAs: `ComfyUI/models/loras` (create a `Mflux` subdirectory to keep them organized).
 
 ## Workflows
 
-See the workflows folder for examples (txt2img, img2img, LoRA stack, ControlNet canny, and integrations).
-If nodes are red, use ComfyUI-Manager “One‑click Install Missing Nodes.”
+Check the `workflows` folder for JSON examples:
+- `Mflux text2img.json`
+- `Mflux img2img.json`
+- `Mflux ControlNet.json`
+- `Mflux Fill/Redux/Depth` examples (if available)
+
+If nodes appear red in ComfyUI, use the Manager's "Install Missing Custom Nodes" feature.
 
 ## Acknowledgements
 
-- mflux by @filipstrand and contributors: https://github.com/filipstrand/mflux
-- Some code structure inspired by @CharafChnioune’s MFLUX-WEBUI (Apache‑2.0) with license notes in the referenced areas
+- **mflux** by [@filipstrand](https://github.com/filipstrand) and contributors.
+- Original ComfyUI integration concepts by **raysers**.
+- Some code structure inspired by **MFLUX-WEBUI**.
 
 ## License
 

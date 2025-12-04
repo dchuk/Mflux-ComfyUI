@@ -174,6 +174,11 @@ def generate_image(prompt, model, seed, width, height, steps, guidance, quantize
         "guidance": guidance,
     }
 
+    # Z-Image Turbo does not accept 'guidance'
+    if isinstance(flux, ZImageTurbo):
+        if "guidance" in gen_kwargs:
+            del gen_kwargs["guidance"]
+
     # Add variant-specific arguments
     if variant == "fill":
         if image: gen_kwargs["image_path"] = image.image_path

@@ -13,6 +13,12 @@ This fork upgrades the original nodes to use **mflux 0.13.1** while keeping Comf
 - **Graph compatibility**: Legacy inputs are migrated internally so your old graphs still work.
 - **Unified Loading**: Seamlessly handles local paths, HuggingFace repo IDs, and predefined aliases (e.g., `dev`, `schnell`).
 
+## What's New in mflux 0.13.1
+This version brings significant backend enhancements:
+- **Z-Image Turbo Support**: Support for the fast, distilled Z-Image variant optimized for speed.
+- **FIBO VLM Quantization**: Support for quantized (3/4/5/6/8-bit) FIBO VLM commands (`inspire`/`refine`).
+- **Unified Architecture**: Improved resolution for models, LoRAs, and tokenizers.
+
 ## Key features
 
 - **Core Generation**: Quick text2img and img2img in one node (`QuickMfluxNode`).
@@ -34,7 +40,7 @@ This fork upgrades the original nodes to use **mflux 0.13.1** while keeping Comf
    ```
 2. Clone the repository:
    ```bash
-   git clone https://github.com/joonsoome/Mflux-ComfyUI.git
+   git clone https://github.com/rurounigit/Mflux-ComfyUI.git
    ```
 3. Activate your ComfyUI virtual environment and install dependencies:
    ```bash

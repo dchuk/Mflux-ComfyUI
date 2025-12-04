@@ -281,7 +281,7 @@ class MfluxLorasLoader:
             (os.path.join(lora_base_path, "loras", kwargs.get(f"Lora{i}")), kwargs.get(f"scale{i}"))
             for i in range(1, 4) if kwargs.get(f"Lora{i}") != "None"
         ]
-        
+
         if Loras is not None and isinstance(Loras, MfluxLorasPipeline):
             lora_paths = Loras.lora_paths
             lora_scales = Loras.lora_scales
@@ -302,7 +302,7 @@ class MfluxControlNetPipeline:
         self.control_image_path = control_image_path
         self.control_strength = control_strength
         self.save_canny = save_canny
- 
+
 
     def clear_cache(self):
         self.model_selection = None
@@ -338,7 +338,7 @@ class MfluxControlNetLoader:
     FUNCTION = "load_and_select"
 
     def load_and_select(self, model_selection, image, control_strength, save_canny):
-        
+
         control_image_path = folder_paths.get_annotated_filepath(image)
         # Use oriented version for consistent sizing and preprocessing
         oriented_path, width, height = _make_oriented_copy(control_image_path)

@@ -1,15 +1,15 @@
 <h1 align="center">Mflux-ComfyUI (v2)</h1>
 
 <p align="center">
-    <strong>ComfyUI nodes for mflux 0.10.x (Apple Silicon/MLX)</strong><br/>
+    <strong>ComfyUI nodes for mflux 0.13.1 (Apple Silicon/MLX)</strong><br/>
     <a href="README.md.kr">한국어</a> | <a href="README_zh.md">中文</a>
 </p>
 
 ## Overview
 
-This fork upgrades the original nodes to use mflux >= 0.10.0 while keeping ComfyUI workflow compatibility (no graph rewiring required). It adds third‑party model support, richer quantization options, better LoRA handling, and a small MLX version hint in the UI.
+This fork upgrades the original nodes to use **mflux 0.13.1** while keeping ComfyUI workflow compatibility (no graph rewiring required). It adds third‑party model support, richer quantization options, better LoRA handling, and a small MLX version hint in the UI.
 
-- Backend: mflux 0.10.x only (legacy 0.4.1 runtime not supported)
+- Backend: **mflux 0.13.1 only** (legacy 0.10.x/0.4.1 runtimes not supported)
 - Graph compatibility: legacy inputs are migrated internally so your old graphs still work
 - OS/Accel: macOS + MLX (Apple Silicon). MLX >= 0.27.0 recommended
 
@@ -30,14 +30,14 @@ Using ComfyUI-Manager (recommended):
 Manual:
 1) cd /path/to/ComfyUI/custom_nodes
 2) git clone https://github.com/joonsoome/Mflux-ComfyUI.git
-3) Activate your ComfyUI venv and install mflux 0.10.x:
+3) Activate your ComfyUI venv and install mflux 0.13.1:
      - pip install --upgrade pip wheel setuptools
-     - pip install 'mlx>=0.27.0' 'huggingface_hub>=0.24'
-     - pip install 'mflux==0.10.0'
+     - pip install 'mlx>=0.27.0' 'huggingface_hub>=0.26.0'
+     - pip install 'mflux==0.13.1'
 4) Restart ComfyUI
 
 Notes:
-- requirements.txt pins mflux==0.10.0; pyproject uses mflux>=0.10.0
+- requirements.txt pins mflux==0.13.1
 - MLX < 0.27.0 will show a UI hint; upgrade is recommended for stability/perf
 
 ## Environment (macOS / zsh)
@@ -73,8 +73,8 @@ Under MFlux/Pro:
 
 This fork also includes several Pro-phase nodes and unit tests that are not part of the upstream quick-start. They are intended for contributors and advanced users:
 
-- MfluxUpscale (MFlux/Pro): an upscaler node that accepts a ComfyUI `IMAGE` tensor as the preferred input and has backwards-compatible support for legacy file-selection widgets. The node writes a temporary PNG when an IMAGE tensor is provided and will save PNG + JSON metadata by default.
-- MfluxFill, MfluxDepth, MfluxRedux (MFlux/Pro): additional Flux tools (inpainting/fill, depth-conditioned generation, and redux/variations). These nodes forward phase-2 style config keys such as `masked_image_path`, `depth_image_path`, `redux_image_paths`, and `redux_image_strengths` to the core `generate_image` flow.
+- **MfluxUpscale** (MFlux/Pro): an upscaler node that accepts a ComfyUI `IMAGE` tensor as the preferred input and has backwards-compatible support for legacy file-selection widgets. The node writes a temporary PNG when an IMAGE tensor is provided and will save PNG + JSON metadata by default.
+- **MfluxFill, MfluxDepth, MfluxRedux** (MFlux/Pro): additional Flux tools (inpainting/fill, depth-conditioned generation, and redux/variations). These nodes forward phase-2 style config keys such as `masked_image_path`, `depth_image_path`, `redux_image_paths`, and `redux_image_strengths` to the core `generate_image` flow.
 
 Tests added in the `tests/` folder include unit-level tests that:
 

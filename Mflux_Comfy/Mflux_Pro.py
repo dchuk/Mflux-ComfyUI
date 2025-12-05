@@ -1,15 +1,23 @@
 import os
-from PIL import Image, ImageOps  # ImageOps is strictly required here for exif_transpose and Canny
+from PIL import Image, ImageOps
 import folder_paths
 import numpy as np
 import torch
 
-# Try to import ControlnetUtil from mflux; if unavailable or missing helpers, provide a local fallback
-try:
-    from mflux.controlnet.controlnet_util import ControlnetUtil  # type: ignore
-    if not hasattr(ControlnetUtil, "preprocess_canny") or not hasattr(ControlnetUtil, "scale_image"):
-        raise AttributeError("ControlnetUtil missing expected helpers")
-except Exception:
+# Check if mflux imports are disabled (e.g. during tests or on Linux)
+_skip_mflux_import = os.environ.get("MFLUX_COMFY_DISABLE_MFLUX_IMPORT") == "1"
+
+# Try to import ControlnetUtil from mflux; if disabled, unavailable, or missing helpers, provide a local fallback
+ControlnetUtil = None
+if not _skip_mflux_import:
+    try:
+        from mflux.controlnet.controlnet_util import ControlnetUtil  # type: ignore
+        if not hasattr(ControlnetUtil, "preprocess_canny") or not hasattr(ControlnetUtil, "scale_image"):
+            ControlnetUtil = None
+    except ImportError:
+        pass
+
+if ControlnetUtil is None:
     from PIL import ImageFilter
 
     class ControlnetUtil:  # type: ignore
@@ -76,7 +84,6 @@ class MfluxImg2Img:
     def INPUT_TYPES(cls):
         input_dir = folder_paths.get_input_directory()
         files = []
-        # Added robustness check for CI environments where input_dir might not exist
         try:
             if os.path.exists(input_dir):
                 files = [f for f in os.listdir(input_dir) if os.path.isfile(os.path.join(input_dir, f))]
@@ -258,7 +265,6 @@ class MfluxLorasLoader:
     @classmethod
     def INPUT_TYPES(cls):
         lora_base_path = folder_paths.models_dir
-        # Robust check for loras directory
         loras_relative = ["None"]
         try:
             loras_relative += folder_paths.get_filename_list("loras")

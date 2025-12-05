@@ -131,13 +131,15 @@ def load_or_create_flux(model_name, quantize, path, lora_paths, lora_scales, var
         print(f"[MFlux-ComfyUI] Loading model: {model_name} (Base: {base_model}, Variant: {variant})")
 
         # Resolve ModelConfig
+        # For Redux/Fill/Depth, we need specific configs
         if variant == "fill":
-            model_config = ModelConfig.dev_fill()
+            model_config = ModelConfig.dev_fill() # Fill usually implies dev-fill
         elif variant == "depth":
             model_config = ModelConfig.dev_depth()
         elif variant == "redux":
             model_config = ModelConfig.dev_redux()
         elif variant == "controlnet":
+            # If using standard canny, use the preset, otherwise generic dev
             if controlnet_path == "InstantX/FLUX.1-dev-Controlnet-Canny":
                 model_config = ModelConfig.dev_controlnet_canny()
             elif "upscaler" in str(controlnet_path).lower():
@@ -165,6 +167,10 @@ def load_or_create_flux(model_name, quantize, path, lora_paths, lora_scales, var
         elif variant == "redux":
             flux = Flux1Redux(model_config=model_config, **common_args)
         elif variant == "controlnet":
+            # ControlNet needs the specific controlnet path if it's not the default in config
+            # But mflux 0.13.1 Flux1Controlnet constructor doesn't take controlnet_path arg directly
+            # if it's defined in model_config. However, for custom ones, we might need to handle it.
+            # For now, we assume the ModelConfig handles the mapping or we use the default.
             flux = Flux1Controlnet(model_config=model_config, **common_args)
         else:
             flux = Flux1(model_config=model_config, **common_args)
@@ -252,6 +258,7 @@ def generate_image(prompt, model, seed, width, height, steps, guidance, quantize
 
     # Add variant-specific arguments
     if variant == "fill":
+        # Flux1Fill requires image_path and masked_image_path
         if image: gen_kwargs["image_path"] = image.image_path
         gen_kwargs["masked_image_path"] = masked_image_path
     elif variant == "depth":
@@ -265,6 +272,7 @@ def generate_image(prompt, model, seed, width, height, steps, guidance, quantize
         gen_kwargs["controlnet_image_path"] = controlnet_image_path
         gen_kwargs["controlnet_strength"] = controlnet_strength
     else:
+        # Standard txt2img / img2img
         if image:
             gen_kwargs["image_path"] = image.image_path
             gen_kwargs["image_strength"] = image.image_strength

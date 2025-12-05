@@ -4,19 +4,24 @@ import folder_paths
 import numpy as np
 import torch
 
-# Check if mflux imports are disabled (e.g. during tests or on Linux)
-_skip_mflux_import = os.environ.get("MFLUX_COMFY_DISABLE_MFLUX_IMPORT") == "1"
+# --- ControlNet Import Logic ---
+# We check if imports are disabled (e.g. during tests or on Linux) to avoid
+# loading a Mock object or crashing on missing dependencies.
+_skip_controlnet = os.environ.get("MFLUX_COMFY_DISABLE_CONTROLNET_IMPORT") == "1"
+_skip_mflux = os.environ.get("MFLUX_COMFY_DISABLE_MFLUX_IMPORT") == "1"
 
-# Try to import ControlnetUtil from mflux; if disabled, unavailable, or missing helpers, provide a local fallback
 ControlnetUtil = None
-if not _skip_mflux_import:
+
+if not (_skip_controlnet or _skip_mflux):
     try:
         from mflux.controlnet.controlnet_util import ControlnetUtil  # type: ignore
+        # Verify the imported utility has the methods we need (handles partial mocks or old versions)
         if not hasattr(ControlnetUtil, "preprocess_canny") or not hasattr(ControlnetUtil, "scale_image"):
             ControlnetUtil = None
     except ImportError:
         pass
 
+# Fallback implementation using PIL if mflux is missing, disabled, or incompatible
 if ControlnetUtil is None:
     from PIL import ImageFilter
 

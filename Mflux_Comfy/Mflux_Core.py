@@ -252,7 +252,8 @@ def generate_image(prompt, model, seed, width, height, steps, guidance, quantize
     }
 
     # Z-Image Turbo does not accept 'guidance'
-    if isinstance(flux, ZImageTurbo):
+    # Check if ZImageTurbo class is available (it might be None in CI/no-mflux envs)
+    if ZImageTurbo is not None and isinstance(flux, ZImageTurbo):
         if "guidance" in gen_kwargs:
             del gen_kwargs["guidance"]
 
@@ -373,6 +374,7 @@ def save_images_with_metadata(images, prompt, model, quantize, Local_model, seed
             "lora_scales": lora_scales,
             "control_image_path": control_image_path,
             "control_strength": control_strength,
+            "control_model": control_model,
             "masked_image_path": extra_pnginfo.get("masked_image_path") if extra_pnginfo else None,
             "depth_image_path": extra_pnginfo.get("depth_image_path") if extra_pnginfo else None,
             "redux_image_paths": extra_pnginfo.get("redux_image_paths") if extra_pnginfo else None,

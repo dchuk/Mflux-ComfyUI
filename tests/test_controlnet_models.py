@@ -19,6 +19,7 @@ def test_controlnet_models_default_when_runtime_disabled(monkeypatch):
 def test_controlnet_loader_uses_discovery(monkeypatch):
     import Mflux_Comfy.Mflux_Core as core
     import Mflux_Comfy.Mflux_Pro as pro
+    import importlib
 
     # 1. Ensure ModelConfig is NOT None so it tries to import
     monkeypatch.setattr(core, "ModelConfig", object())
@@ -45,6 +46,9 @@ def test_controlnet_loader_uses_discovery(monkeypatch):
     # 5. Verify Loader uses this list
     # We need to patch the function on core because Mflux_Pro imports it
     monkeypatch.setattr(core, "get_available_controlnet_models", lambda: ["Repo/Alpha", "Repo/Beta"])
+
+    # Reload Mflux_Pro to pick up the patched function
+    importlib.reload(pro)
 
     # Reload INPUT_TYPES to pick up the change
     input_types = pro.MfluxControlNetLoader.INPUT_TYPES()

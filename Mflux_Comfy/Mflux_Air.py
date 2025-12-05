@@ -1,14 +1,9 @@
 import os
-import json
 from folder_paths import models_dir
-from typing import Any, Dict, Optional
+from .Mflux_Core import get_lora_info, generate_image, save_images_with_metadata, infer_quant_bits, is_third_party_model
 
-# --- MFLUX Imports with Guards ---
-_skip_mflux_import = os.environ.get("MFLUX_COMFY_DISABLE_MFLUX_IMPORT") == "1"
-
+# --- MFLUX 0.13.1 Imports with CI Guards ---
 try:
-    if _skip_mflux_import:
-        raise ImportError("Skipping Mflux import via env var")
     from mflux.models.common.config import ModelConfig
     from mflux.models.flux.variants.txt2img.flux import Flux1
 except ImportError:
@@ -19,8 +14,6 @@ try:
     from huggingface_hub import snapshot_download
 except ImportError:
     snapshot_download = None
-
-from .Mflux_Core import get_lora_info, generate_image, save_images_with_metadata, infer_quant_bits, is_third_party_model
 
 def create_directory(directory):
     if not os.path.exists(directory):
@@ -33,75 +26,20 @@ create_directory(mflux_dir)
 def get_full_model_path(model_dir, model_name):
     return os.path.join(model_dir, model_name)
 
-def _marker_path(dir_path: str) -> str:
-    return os.path.join(dir_path, ".mflux_download.json")
-
-def _write_marker(dir_path: str, repo_id: str):
-    try:
-        files_count = 0
-        for root, _, files in os.walk(dir_path):
-            files_count += len([f for f in files if not f.startswith(".")])
-        data = {"repo_id": repo_id, "files_count": files_count}
-        with open(_marker_path(dir_path), "w") as f:
-            json.dump(data, f)
-    except Exception as e:
-        print(f"[MFlux-ComfyUI] Warning: Failed to write marker for {dir_path}: {e}")
-
-def _has_marker(dir_path: str) -> bool:
-    return os.path.exists(_marker_path(dir_path))
-
-def _looks_like_model_root(dir_path: str) -> bool:
-    """Heuristic to decide if a directory is a model root."""
-    if _has_marker(dir_path):
-        return True
-    try:
-        # Exclude any path that clearly lives under caches
-        lowered = dir_path.lower()
-        if any(seg in lowered for seg in ("/cache/", "/.cache/", "/huggingface/", "/download/")):
-            return False
-        entries = [e.name for e in os.scandir(dir_path) if e.is_dir()]
-        # Typical mflux model roots have some of these components as immediate subfolders
-        typical = {"vae", "tokenizer", "text_encoder", "text_encoder_2", "transformer"}
-        if len(typical.intersection(set(entries))) >= 2:
-            return True
-        # Or the directory contains a non-trivial number of files at its root
-        file_count = sum(1 for e in os.scandir(dir_path) if e.is_file())
-        if file_count >= 5:
-            return True
-    except Exception:
-        pass
-    return False
-
 def download_hg_model(model_version, force_redownload=False):
     if snapshot_download is None:
-        raise RuntimeError(
-            "huggingface_hub is required for model downloads. "
-            "Activate your ComfyUI virtual environment and install it with: "
-            "pip install 'huggingface_hub>=0.26.0'"
-        )
+        raise RuntimeError("huggingface_hub is required. Please install it: pip install huggingface_hub")
 
     repo_id = model_version if "/" in model_version else (f"madroid/{model_version}" if "4bit" in model_version else f"AITRADER/{model_version}")
     model_checkpoint = get_full_model_path(mflux_dir, model_version)
 
-    must_download = True
-    if os.path.exists(model_checkpoint):
-        if _has_marker(model_checkpoint) or _looks_like_model_root(model_checkpoint):
-            if force_redownload:
-                print(f"Model {model_version} exists but force_redownload=True. Re-downloading...")
-            else:
-                print(f"Model {model_version} already exists at {model_checkpoint}. Skipping download.")
-                must_download = False
-        else:
-            print(f"Model folder exists without completion marker: {model_checkpoint}. Resuming download...")
+    # Standard existence check (no legacy markers)
+    if os.path.exists(model_checkpoint) and not force_redownload:
+        print(f"Model {model_version} found at {model_checkpoint}")
+        return model_checkpoint
 
-    if must_download:
-        print(f"Downloading {repo_id} to {model_checkpoint}...")
-        try:
-            snapshot_download(repo_id=repo_id, local_dir=model_checkpoint, local_dir_use_symlinks=False)
-            _write_marker(model_checkpoint, repo_id)
-        except Exception as e:
-            raise RuntimeError(f"Failed to download '{repo_id}': {e}") from e
-
+    print(f"Downloading {repo_id} to {model_checkpoint}...")
+    snapshot_download(repo_id=repo_id, local_dir=model_checkpoint, local_dir_use_symlinks=False)
     return model_checkpoint
 
 class MfluxModelsDownloader:
@@ -155,8 +93,8 @@ class MfluxCustomModels:
     FUNCTION = "save_model"
 
     def save_model(self, model, quantize, Loras=None, custom_identifier="", base_model="dev"):
-        if Flux1 is None or ModelConfig is None:
-            raise ImportError("MFlux is not installed/loaded properly.")
+        if Flux1 is None:
+            raise ImportError("mflux is not installed or failed to load.")
 
         identifier = custom_identifier if custom_identifier else "default"
         save_dir = get_full_model_path(mflux_dir, f"Mflux-{model}-{quantize}bit-{identifier}")
@@ -164,13 +102,11 @@ class MfluxCustomModels:
 
         lora_paths, lora_scales = get_lora_info(Loras)
 
-        # Support HF repo ids with base_model; else use alias via from_name
         if is_third_party_model(model) or "/" in str(model):
             model_config = ModelConfig.from_name(model_name=model, base_model=base_model)
         else:
             model_config = ModelConfig.from_name(model_name=model, base_model=None)
 
-        # mflux 0.13.1 Flux1 constructor
         flux = Flux1(
             model_config=model_config,
             quantize=int(quantize),
@@ -179,16 +115,23 @@ class MfluxCustomModels:
         )
 
         flux.save_model(save_dir)
-        _write_marker(save_dir, f"custom:{model}:{quantize}")
         print(f"Model saved to {save_dir}")
         return (save_dir,)
 
 class MfluxModelsLoader:
     @classmethod
     def INPUT_TYPES(cls):
+        model_paths = []
+        # Robust check for CI environments where mflux_dir might not exist yet
+        if os.path.exists(mflux_dir):
+            try:
+                model_paths = [f.name for f in os.scandir(mflux_dir) if f.is_dir()]
+            except OSError:
+                pass
+
         return {
             "required": {
-                "model_name": (cls.get_sorted_model_paths() or ["None"],),
+                "model_name": (sorted(model_paths) or ["None"],),
             },
             "optional": {
                 "free_path": ("STRING", {"default": ""}),
@@ -199,20 +142,6 @@ class MfluxModelsLoader:
     RETURN_NAMES = ("Local_model",)
     CATEGORY = "MFlux/Air"
     FUNCTION = "load"
-
-    @classmethod
-    def get_sorted_model_paths(cls):
-        candidates = set()
-        try:
-            if os.path.exists(mflux_dir):
-                for entry in os.scandir(mflux_dir):
-                    if not entry.is_dir():
-                        continue
-                    if _looks_like_model_root(entry.path):
-                        candidates.add(entry.name)
-        except Exception:
-            return []
-        return sorted(list(candidates))
 
     def load(self, model_name="", free_path=""):
         if free_path:
@@ -249,12 +178,6 @@ class QuickMfluxNode:
                 "low_ram": ("BOOLEAN", {"default": False}),
                 "vae_tiling": ("BOOLEAN", {"default": False}),
                 "vae_tiling_split": (["horizontal", "vertical"], {"default": "horizontal"}),
-                # Presets
-                "size_preset": (["Custom", "512x512", "768x1024", "1024x1024", "1024x768"], {"default": "Custom"}),
-                "apply_size_preset": ("BOOLEAN", {"default": True}),
-                "quality_preset": (["Balanced (25 steps)", "Fast (12 steps)", "High Quality (35 steps)", "Custom"], {"default": "Balanced (25 steps)"}),
-                "apply_quality_preset": ("BOOLEAN", {"default": True}),
-                "randomize_seed": ("BOOLEAN", {"default": True}),
             },
             "hidden": {
                 "full_prompt": "PROMPT",
@@ -270,22 +193,7 @@ class QuickMfluxNode:
 
         # Apply presets logic
         final_width, final_height = width, height
-        if apply_size_preset and size_preset != "Custom" and "x" in size_preset:
-            try:
-                w, h = size_preset.split("x")
-                final_width, final_height = int(w), int(h)
-            except ValueError:
-                pass
-
         final_steps, final_guidance = steps, guidance
-        if apply_quality_preset and quality_preset != "Custom":
-            if "Fast" in quality_preset:
-                final_steps = 12
-            elif "High Quality" in quality_preset:
-                final_steps = 35
-            else:
-                final_steps = 25
-
         final_seed = -1 if randomize_seed else seed
 
         generated_images = generate_image(

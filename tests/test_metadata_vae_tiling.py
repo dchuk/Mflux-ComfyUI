@@ -17,13 +17,19 @@ def make_dummy_image_tensor():
 
 
 def test_metadata_includes_vae_tiling(tmp_path, monkeypatch):
-    # Use a temporary output directory by monkeypatching folder_paths.get_output_directory
     import folder_paths
 
     tmp_out = tmp_path / "out"
     tmp_out.mkdir()
 
     monkeypatch.setattr(folder_paths, "get_output_directory", lambda: str(tmp_out))
+
+    # CRITICAL FIX: Mock get_save_image_path to return paths inside our tmp_out
+    # Signature: (full_output_folder, filename, counter, subfolder, filename_prefix)
+    def mock_get_save_image_path(filename_prefix, output_dir, h, w):
+        return (str(tmp_out), filename_prefix, 0, "", filename_prefix)
+
+    monkeypatch.setattr(folder_paths, "get_save_image_path", mock_get_save_image_path)
 
     images = make_dummy_image_tensor()
     prompt = "test"
@@ -70,6 +76,7 @@ def test_metadata_includes_vae_tiling(tmp_path, monkeypatch):
     )
 
     # Inspect the JSON file written
+    # Note: Mflux_Core appends "MFlux" subdir
     outdir = tmp_out / "MFlux"
     files = list(outdir.glob("TEST_MFLUX_*.json"))
     assert files, "No metadata JSON produced"
@@ -78,6 +85,3 @@ def test_metadata_includes_vae_tiling(tmp_path, monkeypatch):
         js = json.load(f)
     assert js.get("vae_tiling") is True
     assert js.get("vae_tiling_split") == "vertical"
-
-    # Cleanup
-    shutil.rmtree(str(tmp_out))

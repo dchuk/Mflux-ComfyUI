@@ -377,6 +377,9 @@ def save_images_with_metadata(images, prompt, model, quantize, Local_model, seed
             "depth_image_path": extra_pnginfo.get("depth_image_path") if extra_pnginfo else None,
             "redux_image_paths": extra_pnginfo.get("redux_image_paths") if extra_pnginfo else None,
             "mflux_version": _get_mflux_version(),
+            "low_ram": low_ram,
+            "vae_tiling": vae_tiling,
+            "vae_tiling_split": vae_tiling_split,
         }
         with open(metadata_jsonfile, 'w') as metadata_file:
             json.dump(json_dict, metadata_file, indent=4)

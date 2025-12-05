@@ -1,3 +1,4 @@
+--- START OF FILE Mflux_Comfy/Mflux_Pro.py ---
 import os
 from PIL import Image, ImageOps
 import folder_paths
@@ -336,10 +337,15 @@ class MfluxControlNetPipeline:
 class MfluxControlNetLoader:
     @classmethod
     def INPUT_TYPES(cls):
-        controlnet_models = [
-            "InstantX/FLUX.1-dev-Controlnet-Canny",
-            "jasperai/Flux.1-dev-Controlnet-Upscaler",
-        ]
+        # Use dynamic discovery from Core to support mflux runtime models
+        try:
+            from .Mflux_Core import get_available_controlnet_models
+            controlnet_models = get_available_controlnet_models()
+        except Exception:
+             controlnet_models = [
+                "InstantX/FLUX.1-dev-Controlnet-Canny",
+                "jasperai/Flux.1-dev-Controlnet-Upscaler",
+            ]
 
         input_dir = folder_paths.get_input_directory()
         files = []
@@ -461,7 +467,7 @@ class MfluxUpscale:
             if os.path.exists(input_dir):
                 files = [f for f in os.listdir(input_dir) if os.path.isfile(os.path.join(input_dir, f))]
         except Exception:
-            pass
+            files = []
 
         return {
             "required": {

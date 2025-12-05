@@ -7,10 +7,22 @@ from PIL import Image
 from PIL.PngImagePlugin import PngInfo
 import folder_paths
 import comfy.utils  # Required for the progress bar
+from importlib import import_module
 
-# --- MFLUX 0.13.1 Imports ---
+# --- MFLUX Imports with Guards (Fixes CI/Linux/Missing Dependency Regressions) ---
+_skip_mlx_import = os.environ.get("MFLUX_COMFY_DISABLE_MLX_IMPORT") == "1"
+_skip_mflux_import = os.environ.get("MFLUX_COMFY_DISABLE_MFLUX_IMPORT") == "1"
+
 try:
+    if _skip_mlx_import:
+        raise ImportError("Skipping MLX import via env var")
     import mlx.core as mx
+except ImportError:
+    mx = None
+
+try:
+    if _skip_mflux_import:
+        raise ImportError("Skipping Mflux import via env var")
     from mflux.models.common.config import ModelConfig
     from mflux.callbacks.callback_registry import CallbackRegistry
     from mflux.models.flux.variants.txt2img.flux import Flux1
@@ -19,13 +31,52 @@ try:
     from mflux.models.flux.variants.depth.flux_depth import Flux1Depth
     from mflux.models.flux.variants.redux.flux_redux import Flux1Redux
     from mflux.models.z_image.variants.turbo.z_image_turbo import ZImageTurbo
-except ImportError as e:
-    raise ImportError("[MFlux-ComfyUI] mflux>=0.13.1 is required. Please update requirements.") from e
+
+    # Optional: Try to import ControlnetUtil
+    try:
+        from mflux.controlnet.controlnet_util import ControlnetUtil
+    except ImportError:
+        ControlnetUtil = None
+
+except ImportError:
+    # Dummy classes to allow the node to load in ComfyUI/CI even if dependencies are missing
+    Flux1 = None
+    Flux1Controlnet = None
+    Flux1Fill = None
+    Flux1Depth = None
+    Flux1Redux = None
+    ZImageTurbo = None
+    ModelConfig = None
+    CallbackRegistry = None
+    ControlnetUtil = None
 
 from .Mflux_Pro import MfluxControlNetPipeline
 
 # Cache for loaded models
 flux_cache = {}
+
+DEFAULT_CONTROLNET_MODELS = [
+    "InstantX/FLUX.1-dev-Controlnet-Canny",
+    "jasperai/Flux.1-dev-Controlnet-Upscaler",
+]
+
+def get_available_controlnet_models() -> list[str]:
+    """Return known ControlNet model repo IDs, falling back to defaults."""
+    if ModelConfig is None:
+        return DEFAULT_CONTROLNET_MODELS.copy()
+
+    try:
+        # Attempt to discover models from mflux config if available
+        model_cfg = import_module("mflux.config.model_config")
+        available = getattr(model_cfg, "AVAILABLE_MODELS", {})
+        models = []
+        for cfg in available.values():
+            control_name = getattr(cfg, "controlnet_model", None)
+            if control_name and control_name not in models:
+                models.append(control_name)
+        return models or DEFAULT_CONTROLNET_MODELS.copy()
+    except Exception:
+        return DEFAULT_CONTROLNET_MODELS.copy()
 
 class ComfyUIProgressBarCallback:
     """Callback to update ComfyUI progress bar during mflux generation."""
@@ -63,6 +114,9 @@ def load_or_create_flux(model_name, quantize, path, lora_paths, lora_scales, var
     """
     Create or fetch a cached Flux model variant.
     """
+    if Flux1 is None:
+        raise ImportError("MFlux is not installed or failed to load.")
+
     effective_model_path = path if path else None
 
     if effective_model_path and quantize is None:
@@ -183,6 +237,12 @@ def generate_image(prompt, model, seed, width, height, steps, guidance, quantize
         "height": height,
         "width": width,
         "guidance": guidance,
+        # Restore parameters that were ignored in previous version
+        # Note: Backend support for low_ram/vae_tiling varies by version,
+        # but passing them is better than ignoring them.
+        "low_ram": low_ram,
+        "vae_tiling": vae_tiling,
+        "vae_tiling_split": vae_tiling_split,
     }
 
     # Z-Image Turbo does not accept 'guidance'
@@ -212,22 +272,35 @@ def generate_image(prompt, model, seed, width, height, steps, guidance, quantize
     print(f"[MFlux-ComfyUI] Generating ({variant}) seed: {seed_val}, steps: {steps}, dims: {width}x{height}")
 
     # 5. Register Progress Bar Callback
-    # Reset callbacks to ensure we don't have old ones attached
-    flux.callbacks = CallbackRegistry()
-
-    # Create and register the ComfyUI progress bar
-    pbar = ComfyUIProgressBarCallback(total_steps=steps)
-    flux.callbacks.register(pbar)
+    if CallbackRegistry:
+        flux.callbacks = CallbackRegistry()
+        pbar = ComfyUIProgressBarCallback(total_steps=steps)
+        flux.callbacks.register(pbar)
 
     # 6. Generate
     try:
         generated_result = flux.generate_image(**gen_kwargs)
+    except TypeError as e:
+        # Retry without advanced kwargs if backend rejects them
+        if "unexpected keyword argument" in str(e):
+            print(f"[MFlux-ComfyUI] Warning: Backend rejected some arguments ({e}). Retrying with basics...")
+            for k in ["low_ram", "vae_tiling", "vae_tiling_split"]:
+                if k in gen_kwargs:
+                    del gen_kwargs[k]
+            generated_result = flux.generate_image(**gen_kwargs)
+        else:
+            raise e
     except Exception as e:
         print(f"[MFlux-ComfyUI] Error during generation: {e}")
         raise e
 
     # 7. Process Output
-    pil_image = generated_result.image
+    # Handle different return types from mflux versions (object with .image or raw)
+    if hasattr(generated_result, "image"):
+        pil_image = generated_result.image
+    else:
+        pil_image = generated_result
+
     image_np = np.array(pil_image).astype(np.float32) / 255.0
     image_tensor = torch.from_numpy(image_np)
 

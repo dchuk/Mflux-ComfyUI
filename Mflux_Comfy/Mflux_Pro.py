@@ -1,4 +1,3 @@
---- START OF FILE Mflux_Comfy/Mflux_Pro.py ---
 import os
 from PIL import Image, ImageOps
 import folder_paths

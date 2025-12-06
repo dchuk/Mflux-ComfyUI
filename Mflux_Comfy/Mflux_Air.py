@@ -48,15 +48,15 @@ class MfluxModelsDownloader:
         return {
             "required": {
                 "model_version": ([
-                    "flux.1-schnell-mflux-4bit",
-                    "flux.1-dev-mflux-4bit",
-                    "MFLUX.1-schnell-8-bit",
-                    "MFLUX.1-dev-8-bit",
+                    "dhairyashil/FLUX.1-schnell-mflux-v0.6.2-4bit",
+                    "dhairyashil/FLUX.1-dev-mflux-4bit",
                     "filipstrand/FLUX.1-Krea-dev-mflux-4bit",
                     "akx/FLUX.1-Kontext-dev-mflux-4bit",
-                    "Tongyi-MAI/Z-Image-Turbo",
                     "filipstrand/Z-Image-Turbo-mflux-4bit",
-                ], {"default": "flux.1-schnell-mflux-4bit"}),
+                    "briaai/Fibo-mlx-4bit",
+                    "briaai/Fibo-mlx-8bit",
+                    "filipstrand/Qwen-Image-mflux-6bit",
+                ], {"default": "dhairyashil/FLUX.1-schnell-mflux-v0.6.2-4bit"}),
             },
             "optional": {
                 "force_redownload": ("BOOLEAN", {"default": False}),

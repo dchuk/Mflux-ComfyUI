@@ -235,7 +235,7 @@ class QuickMfluxNode:
         return {
             "required": {
                 "prompt": ("STRING", {"multiline": True, "dynamicPrompts": True, "default": "Luxury food photograph"}),
-                "model": ("STRING", {"default": "schnell", "tooltip": "Type an alias (e.g. 'schnell', 'qwen') OR connect a path to 'network_model' below."}),
+                "model": ("STRING", {"default": "schnell", "tooltip": "1. ALIAS: Type 'dev', 'schnell', 'qwen', 'fibo', or 'z-image-turbo'. 'base_model' is ignored if alias is used.\n2. PATH: Type a path or connect the Downloader/Loader node. You MUST set 'base_model' to match the architecture (e.g., 'qwen', 'fibo')."}),
                 "quantize": (["Auto", "None", "3", "4", "5", "6", "8"], {"default": "Auto", "tooltip": "Auto/None = Use model's native weights. Number = Force quantization."}),
                 "seed": ("INT", {"default": -1, "min": -1, "max": 0xffffffffffffffff}),
                 "width": ("INT", {"default": 512, "min": 256, "max": 2048, "step": 8}),
@@ -246,11 +246,11 @@ class QuickMfluxNode:
             },
             "optional": {
                 # New explicit input dock for connections
-                "network_model": ("STRING", {"forceInput": True, "tooltip": "Connect MfluxModelsLoader or Downloader here. Overrides 'model' text field."}),
+                "model_input": ("STRING", {"forceInput": True, "tooltip": "Connect MfluxModelsLoader or Downloader here. Overrides 'model' text field."}),
                 "Loras": ("MfluxLorasPipeline",),
                 "img2img": ("MfluxImg2ImgPipeline",),
                 "ControlNet": ("MfluxControlNetPipeline",),
-                "base_model": (["dev", "schnell", "qwen", "fibo", "z-image-turbo"], {"default": "dev", "tooltip": "Architecture hint. Required if using a custom path."}),
+                "base_model": (["dev", "schnell", "qwen", "fibo", "z-image-turbo"], {"default": "dev", "tooltip": "Architecture hint. Required if 'model' is a custom path. Alias 'base_model' is ignored if 'model' is a Hugging Face ID or known alias."}),
                 "negative_prompt": ("STRING", {"default": "", "multiline": True, "tooltip": "Negative prompt. Only used by Qwen models."}),
                 "optimizations": ("MFLUX_OPTS", {"tooltip": "Connect MfluxOptimizations node here for hardware-specific settings."}),
             },
@@ -266,12 +266,12 @@ class QuickMfluxNode:
     CATEGORY = "MFlux/Air"
     FUNCTION = "generate"
 
-    def generate(self, prompt, model, seed, width, height, steps, guidance, quantize="Auto", metadata=True, img2img=None, Loras=None, ControlNet=None, base_model="dev", negative_prompt="", optimizations=None, network_model=None, Local_model=None, full_prompt=None, extra_pnginfo=None, size_preset="Custom", apply_size_preset=True, quality_preset="Balanced (25 steps)", apply_quality_preset=True, randomize_seed=True):
+    def generate(self, prompt, model, seed, width, height, steps, guidance, quantize="Auto", metadata=True, img2img=None, Loras=None, ControlNet=None, base_model="dev", negative_prompt="", optimizations=None, model_input=None, Local_model=None, full_prompt=None, extra_pnginfo=None, size_preset="Custom", apply_size_preset=True, quality_preset="Balanced (25 steps)", apply_quality_preset=True, randomize_seed=True):
 
-        # Priority: 1. network_model (new dock), 2. Local_model (legacy dock), 3. model (text widget)
+        # Priority: 1. model input (new dock), 2. Local_model (legacy dock), 3. model (text widget)
         final_model = model
-        if network_model and isinstance(network_model, str) and network_model.strip():
-            final_model = network_model
+        if model_input and isinstance(model_input, str) and model_input.strip():
+            final_model = model_input
         elif Local_model and isinstance(Local_model, str) and Local_model.strip():
             final_model = Local_model
 
@@ -355,7 +355,7 @@ class MfluxZImageNode:
         return {
             "required": {
                 "prompt": ("STRING", {"multiline": True, "dynamicPrompts": True, "default": "A cinematic shot of..."}),
-                "model": ("STRING", {"default": "filipstrand/Z-Image-Turbo-mflux-4bit", "tooltip": "Type an alias or connect a path to 'network_model' below."}),
+                "model": ("STRING", {"default": "filipstrand/Z-Image-Turbo-mflux-4bit", "tooltip": "Model alias or path. E.g., 'z-image-turbo' or a Hugging Face ID."}),
                 "seed": ("INT", {"default": -1, "min": -1, "max": 0xffffffffffffffff}),
                 "width": ("INT", {"default": 1024, "min": 256, "max": 2048, "step": 16}),
                 "height": ("INT", {"default": 1024, "min": 256, "max": 2048, "step": 16}),
@@ -366,7 +366,7 @@ class MfluxZImageNode:
                 # Full quantization range + Auto
                 "quantize": (["Auto", "None", "3", "4", "5", "6", "8"], {"default": "Auto", "tooltip": "Auto/None = Use model's native weights. Number = Force quantization."}),
                 # New explicit input dock
-                "network_model": ("STRING", {"forceInput": True, "tooltip": "Connect MfluxModelsLoader or Downloader here. Overrides 'model' text field."}),
+                "model_input": ("STRING", {"forceInput": True, "tooltip": "Connect MfluxModelsLoader or Downloader here. Overrides 'model' text field."}),
                 "Loras": ("MfluxLorasPipeline",),
                 "img2img": ("MfluxImg2ImgPipeline",),
                 "optimizations": ("MFLUX_OPTS", {"tooltip": "Connect MfluxOptimizations node here for Low RAM mode."}),
@@ -383,12 +383,12 @@ class MfluxZImageNode:
     CATEGORY = "MFlux/Air"
     FUNCTION = "generate"
 
-    def generate(self, prompt, model, seed, width, height, steps, metadata=True, quantize="Auto", Loras=None, img2img=None, optimizations=None, network_model=None, Local_model=None, full_prompt=None, extra_pnginfo=None):
+    def generate(self, prompt, model, seed, width, height, steps, metadata=True, quantize="Auto", Loras=None, img2img=None, optimizations=None, model_input=None, Local_model=None, full_prompt=None, extra_pnginfo=None):
 
-        # Priority: 1. network_model, 2. Local_model, 3. model
+        # Priority: 1. model input, 2. Local_model, 3. model
         final_model = model
-        if network_model and isinstance(network_model, str) and network_model.strip():
-            final_model = network_model
+        if model_input and isinstance(model_input, str) and model_input.strip():
+            final_model = model_input
         elif Local_model and isinstance(Local_model, str) and Local_model.strip():
             final_model = Local_model
 

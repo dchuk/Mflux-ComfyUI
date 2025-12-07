@@ -1,4 +1,5 @@
 import os
+import json
 from folder_paths import models_dir
 from .Mflux_Core import get_lora_info, generate_image, save_images_with_metadata, infer_quant_bits, is_third_party_model
 
@@ -101,7 +102,6 @@ class MfluxModelsDownloader:
 
     def download_model(self, model_version, force_redownload=False):
         model_path = download_hg_model(model_version, force_redownload=force_redownload)
-        # Return the path as a string, so it can be connected to the 'model' input of QuickMfluxNode
         return (model_path,)
 
 class MfluxCustomModels:
@@ -115,7 +115,7 @@ class MfluxCustomModels:
             "optional": {
                 "Loras": ("MfluxLorasPipeline",),
                 "custom_identifier": ("STRING", {"default": ""}),
-                "base_model": (["dev", "schnell", "qwen", "fibo", "z-image-turbo"], {"default": "dev", "tooltip": "Architecture hint. Required if 'model' is a custom path. Aliias 'base_model' is ignored if 'model' is a Hugging Face ID."}),
+                "base_model": (["dev", "schnell", "qwen", "fibo", "z-image-turbo"], {"default": "dev", "tooltip": "Architecture hint. Required if 'model' is a custom path. Alias 'base_model' is ignored if 'model' is a Hugging Face ID."}),
             }
         }
 
@@ -144,7 +144,7 @@ class MfluxCustomModels:
 
         # Determine which model class to use based on base_model hint
         target_class = None
-        config_base_model = None # For ModelConfig.from_name
+        config_base_model = None
 
         if base_model == "qwen":
             target_class = QwenImage
@@ -155,15 +155,13 @@ class MfluxCustomModels:
         elif base_model == "z-image-turbo":
             target_class = ZImageTurbo
             config_base_model = "z-image-turbo"
-        else: # Default to Flux for "dev", "schnell", or other hints
+        else: # Default to Flux
             target_class = Flux1
-            config_base_model = base_model # e.g. "dev", "schnell"
+            config_base_model = base_model
 
         if is_third_party_model(model) or "/" in str(model):
-            # If it's a full path or HF ID, base_model hint is crucial for ModelConfig
             model_config = ModelConfig.from_name(model_name=model, base_model=config_base_model)
         else:
-            # If it's an alias, base_model hint is still passed
             model_config = ModelConfig.from_name(model_name=model, base_model=config_base_model)
 
         instance = target_class(
@@ -183,24 +181,20 @@ class MfluxModelsLoader:
         model_paths = []
         if os.path.exists(mflux_dir):
             try:
+                # List all directories without filtering to ensure user flexibility
                 model_paths = [f.name for f in os.scandir(mflux_dir) if f.is_dir()]
             except OSError:
                 pass
 
         # Add common aliases for convenience
         available_aliases = ["dev", "schnell", "qwen", "fibo", "z-image-turbo"]
-        # Filter out aliases that might conflict with directory names if a user named a folder "dev" etc.
-        # This is a simple heuristic; more robust alias handling might be needed later.
         final_options = available_aliases.copy()
+
         for path_name in model_paths:
-            if path_name not in available_aliases:
-                 # Heuristic to add custom model dirs if they seem to follow a pattern
-                if any(model_type in path_name.lower() for model_type in ["flux", "fibo", "qwen", "z-image"]):
-                     if path_name not in final_options:
-                        final_options.append(path_name)
+            if path_name not in final_options:
+                final_options.append(path_name)
 
         final_options.sort()
-
 
         return {
             "required": {
@@ -211,8 +205,8 @@ class MfluxModelsLoader:
             }
         }
 
-    RETURN_TYPES = ("STRING",) # Changed to STRING to match new model input type
-    RETURN_NAMES = ("model_string",) # Changed to model_string
+    RETURN_TYPES = ("STRING",)
+    RETURN_NAMES = ("model_string",)
     CATEGORY = "MFlux/Air"
     FUNCTION = "load"
 
@@ -223,20 +217,17 @@ class MfluxModelsLoader:
             return (free_path,)
 
         if model_name and model_name != "None":
-            # If it's a known alias, return the alias itself
             if model_name in ["dev", "schnell", "qwen", "fibo", "z-image-turbo"]:
                 return (model_name,)
-            # Otherwise, assume it's a path to a local directory
+
             full_path = get_full_model_path(mflux_dir, model_name)
             if os.path.exists(full_path):
                 return (full_path,)
             else:
-                # Fallback: return the name, let downstream handle it
                 print(f"Warning: Local model path {full_path} not found. Passing model name '{model_name}' as string.")
                 return (model_name,)
 
-
-        return ("",) # Return empty string if nothing selected
+        return ("",)
 
 class QuickMfluxNode:
     @classmethod
@@ -244,8 +235,8 @@ class QuickMfluxNode:
         return {
             "required": {
                 "prompt": ("STRING", {"multiline": True, "dynamicPrompts": True, "default": "Luxury food photograph"}),
-                "model": ("STRING", {"default": "schnell", "tooltip": "1. ALIAS: Type 'dev', 'schnell', 'qwen', 'fibo', or 'z-image-turbo'. 'base_model' is ignored if alias is used.\n2. PATH: Type a path or connect the Downloader/Loader node. You MUST set 'base_model' to match the architecture (e.g., 'qwen', 'fibo')."}),
-                "quantize": (["None", "3", "4", "5", "6", "8"], {"default": "8"}),
+                "model": ("STRING", {"default": "schnell", "tooltip": "1. ALIAS: Type 'dev', 'schnell', 'qwen', 'fibo', or 'z-image-turbo'.\n2. PATH: Type a path or connect the Downloader/Loader node."}),
+                "quantize": (["Auto", "None", "3", "4", "5", "6", "8"], {"default": "Auto", "tooltip": "Auto/None = Use model's native weights (recommended for pre-quantized models). Number = Force quantization."}),
                 "seed": ("INT", {"default": -1, "min": -1, "max": 0xffffffffffffffff}),
                 "width": ("INT", {"default": 512, "min": 256, "max": 2048, "step": 8}),
                 "height": ("INT", {"default": 512, "min": 256, "max": 2048, "step": 8}),
@@ -257,9 +248,11 @@ class QuickMfluxNode:
                 "Loras": ("MfluxLorasPipeline",),
                 "img2img": ("MfluxImg2ImgPipeline",),
                 "ControlNet": ("MfluxControlNetPipeline",),
-                "base_model": (["dev", "schnell", "qwen", "fibo", "z-image-turbo"], {"default": "dev", "tooltip": "Architecture hint. Required if 'model' is a custom path. Alias 'base_model' is ignored if 'model' is a Hugging Face ID or known alias."}),
+                "base_model": (["dev", "schnell", "qwen", "fibo", "z-image-turbo"], {"default": "dev", "tooltip": "Architecture hint. Required if 'model' is a custom path."}),
                 "negative_prompt": ("STRING", {"default": "", "multiline": True, "tooltip": "Negative prompt. Only used by Qwen models."}),
                 "optimizations": ("MFLUX_OPTS", {"tooltip": "Connect MfluxOptimizations node here for hardware-specific settings."}),
+                # Legacy input for backward compatibility
+                "Local_model": ("PATH", {"tooltip": "(Legacy) If connected, this overrides the 'model' input."}),
             },
             "hidden": {
                 "full_prompt": "PROMPT",
@@ -271,7 +264,12 @@ class QuickMfluxNode:
     CATEGORY = "MFlux/Air"
     FUNCTION = "generate"
 
-    def generate(self, prompt, model, seed, width, height, steps, guidance, quantize="None", metadata=True, img2img=None, Loras=None, ControlNet=None, base_model="dev", negative_prompt="", optimizations=None, full_prompt=None, extra_pnginfo=None, size_preset="Custom", apply_size_preset=True, quality_preset="Balanced (25 steps)", apply_quality_preset=True, randomize_seed=True):
+    def generate(self, prompt, model, seed, width, height, steps, guidance, quantize="Auto", metadata=True, img2img=None, Loras=None, ControlNet=None, base_model="dev", negative_prompt="", optimizations=None, Local_model=None, full_prompt=None, extra_pnginfo=None, size_preset="Custom", apply_size_preset=True, quality_preset="Balanced (25 steps)", apply_quality_preset=True, randomize_seed=True):
+
+        # Backward compatibility: If Local_model is provided, it takes precedence over default 'schnell'
+        final_model = model
+        if Local_model and isinstance(Local_model, str) and Local_model.strip():
+            final_model = Local_model
 
         final_width, final_height = width, height
         final_steps, final_guidance = steps, guidance
@@ -281,9 +279,12 @@ class QuickMfluxNode:
         vae_tiling = optimizations.get("vae_tiling", False) if optimizations else False
         vae_tiling_split = optimizations.get("vae_tiling_split", "horizontal") if optimizations else "horizontal"
 
+        # Handle Auto quantization
+        q_val = None if quantize in ("Auto", "None") else quantize
+
         generated_images = generate_image(
-            prompt, model, final_seed, final_width, final_height, final_steps, final_guidance, quantize, metadata,
-            model_path=model, # Pass 'model' string as 'model_path'
+            prompt, final_model, final_seed, final_width, final_height, final_steps, final_guidance, q_val, metadata,
+            model_path=final_model,
             img2img_pipeline=img2img,
             loras_pipeline=Loras,
             controlnet_pipeline=ControlNet,
@@ -299,10 +300,14 @@ class QuickMfluxNode:
             image_strength = img2img.image_strength if img2img else None
             lora_paths, lora_scales = get_lora_info(Loras)
 
+            # Try to infer effective quantization for metadata
             quantize_effective = quantize
-            # if model_path: # This check needs to be against the actual resolved path
-            #     detected = infer_quant_bits(model_path)
-            #     if detected: quantize_effective = f"{detected}-bit"
+            if quantize in ("Auto", "None"):
+                detected = infer_quant_bits(final_model)
+                if detected:
+                    quantize_effective = f"Auto ({detected}-bit)"
+                else:
+                    quantize_effective = "Auto (Native)"
 
             control_image_path = None
             control_strength = None
@@ -315,10 +320,10 @@ class QuickMfluxNode:
             save_images_with_metadata(
                 images=generated_images,
                 prompt=prompt,
-                model_alias=model, # Store the alias/path string used for generation
+                model_alias=final_model,
                 quantize=quantize,
                 quantize_effective=quantize_effective,
-                model_path=model, # Store the path string
+                model_path=final_model,
                 seed=final_seed,
                 height=final_height,
                 width=final_width,
@@ -333,9 +338,9 @@ class QuickMfluxNode:
                 control_model=control_model,
                 full_prompt=full_prompt,
                 extra_pnginfo=extra_pnginfo,
-                base_model_hint=base_model, # Store the base model hint
-                negative_prompt_used=negative_prompt, # Store if negative prompt was used
-                vae_tiling=vae_tiling, # Store vae tiling settings
+                base_model_hint=base_model,
+                negative_prompt_used=negative_prompt,
+                vae_tiling=vae_tiling,
                 vae_tiling_split=vae_tiling_split
             )
 
@@ -355,7 +360,7 @@ class MfluxZImageNode:
                 "metadata": ("BOOLEAN", {"default": True}),
             },
             "optional": {
-                "quantize": (["None", "4", "8"], {"default": "None", "tooltip": "Use '4' if loading the full model and want to save RAM. Leave 'None' for pre-quantized models."}),
+                "quantize": (["Auto", "None", "4", "8"], {"default": "Auto", "tooltip": "Auto/None = Use model's native weights. Use '4' only if loading a full unquantized model."}),
                 "Loras": ("MfluxLorasPipeline",),
                 "img2img": ("MfluxImg2ImgPipeline",),
                 "optimizations": ("MFLUX_OPTS", {"tooltip": "Connect MfluxOptimizations node here for Low RAM mode."}),
@@ -370,30 +375,31 @@ class MfluxZImageNode:
     CATEGORY = "MFlux/Air"
     FUNCTION = "generate"
 
-    def generate(self, prompt, model, seed, width, height, steps, metadata=True, quantize="None", Loras=None, img2img=None, optimizations=None, full_prompt=None, extra_pnginfo=None):
+    def generate(self, prompt, model, seed, width, height, steps, metadata=True, quantize="Auto", Loras=None, img2img=None, optimizations=None, full_prompt=None, extra_pnginfo=None):
 
-        guidance = 0.0 # Z-Image does not use guidance
+        guidance = 0.0
 
-        if "4bit" in model and quantize == "None":
-            quantize = "4" # Default quantization for 4bit models
+        # Handle Auto quantization
+        q_val = None if quantize in ("Auto", "None") else quantize
+
+        # Fallback logic for Z-Image specific defaults if user explicitly chose None on a 4bit model?
+        # No, "Auto" handles this best. If user selects "None", we respect it.
 
         low_ram = optimizations.get("low_ram", False) if optimizations else False
-        # vae_tiling is not applicable to Z-Image, but we'll pass it through to generate_image for consistency if needed
         vae_tiling = optimizations.get("vae_tiling", False) if optimizations else False
         vae_tiling_split = optimizations.get("vae_tiling_split", "horizontal") if optimizations else "horizontal"
 
-
         generated_images = generate_image(
-            prompt, model, seed, width, height, steps, guidance, quantize, metadata,
-            model_path=model, # Pass 'model' string as 'model_path'
+            prompt, model, seed, width, height, steps, guidance, q_val, metadata,
+            model_path=model,
             img2img_pipeline=img2img,
             loras_pipeline=Loras,
-            controlnet_pipeline=None, # Z-Image node does not have ControlNet
-            base_model_hint="z-image-turbo", # Explicit hint for Z-Image
-            negative_prompt="", # Z-Image does not support negative prompts
+            controlnet_pipeline=None,
+            base_model_hint="z-image-turbo",
+            negative_prompt="",
             low_ram=low_ram,
-            vae_tiling=vae_tiling, # Will be ignored by ZImageTurbo generation logic
-            vae_tiling_split=vae_tiling_split # Will be ignored
+            vae_tiling=vae_tiling,
+            vae_tiling_split=vae_tiling_split
         )
 
         if metadata:
@@ -402,9 +408,12 @@ class MfluxZImageNode:
             lora_paths, lora_scales = get_lora_info(Loras)
 
             quantize_effective = quantize
-            # if model_path: # This check needs to be against the actual resolved path
-            #     detected = infer_quant_bits(model_path)
-            #     if detected: quantize_effective = f"{detected}-bit"
+            if quantize in ("Auto", "None"):
+                detected = infer_quant_bits(model)
+                if detected:
+                    quantize_effective = f"Auto ({detected}-bit)"
+                else:
+                    quantize_effective = "Auto (Native)"
 
             save_images_with_metadata(
                 images=generated_images,
@@ -425,8 +434,8 @@ class MfluxZImageNode:
                 full_prompt=full_prompt,
                 extra_pnginfo=extra_pnginfo,
                 base_model_hint="z-image-turbo",
-                negative_prompt_used="", # Z-Image does not use it
-                vae_tiling=vae_tiling, # Store even if not used
+                negative_prompt_used="",
+                vae_tiling=vae_tiling,
                 vae_tiling_split=vae_tiling_split
             )
         return generated_images

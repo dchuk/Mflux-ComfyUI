@@ -1,6 +1,6 @@
 try:
     # Normal package import when executed as a package by ComfyUI
-    from .Mflux_Comfy.Mflux_Air import QuickMfluxNode, MfluxModelsLoader, MfluxModelsDownloader, MfluxCustomModels, MfluxZImageNode
+    from .Mflux_Comfy.Mflux_Air import QuickMfluxNode, MfluxModelsLoader, MfluxModelsDownloader, MfluxCustomModels, MfluxZImageNode, MfluxOptimizations
     from .Mflux_Comfy.Mflux_Pro import MfluxImg2Img, MfluxLorasLoader, MfluxControlNetLoader, MfluxUpscale
 except Exception:
     # Fallback for environments where relative imports fail (e.g., direct execution during tests).
@@ -12,7 +12,7 @@ except Exception:
         sys.path.insert(0, pkg_root)
     if comfy_root not in sys.path:
         sys.path.insert(0, comfy_root)
-    from Mflux_Comfy.Mflux_Air import QuickMfluxNode, MfluxModelsLoader, MfluxModelsDownloader, MfluxCustomModels, MfluxZImageNode
+    from Mflux_Comfy.Mflux_Air import QuickMfluxNode, MfluxModelsLoader, MfluxModelsDownloader, MfluxCustomModels, MfluxZImageNode, MfluxOptimizations
     from Mflux_Comfy.Mflux_Pro import MfluxImg2Img, MfluxLorasLoader, MfluxControlNetLoader, MfluxUpscale
 
 NODE_CLASS_MAPPINGS = {
@@ -25,6 +25,7 @@ NODE_CLASS_MAPPINGS = {
     "MfluxLorasLoader": MfluxLorasLoader,
     "MfluxControlNetLoader": MfluxControlNetLoader,
     "MfluxUpscale": MfluxUpscale,
+    "MfluxOptimizations": MfluxOptimizations,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -37,4 +38,5 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "MfluxLorasLoader": "MFlux Loras Loader",
     "MfluxControlNetLoader": "MFlux ControlNet Loader",
     "MfluxUpscale": "MFlux Upscale",
+    "MfluxOptimizations": "MFlux Optimizations",
 }

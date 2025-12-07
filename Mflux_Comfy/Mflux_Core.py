@@ -30,7 +30,10 @@ try:
     from mflux.models.flux.variants.fill.flux_fill import Flux1Fill
     from mflux.models.flux.variants.depth.flux_depth import Flux1Depth
     from mflux.models.flux.variants.redux.flux_redux import Flux1Redux
+    from mflux.models.fibo.variants.txt2img.fibo import FIBO
+    from mflux.models.qwen.variants.txt2img.qwen_image import QwenImage
     from mflux.models.z_image.variants.turbo.z_image_turbo import ZImageTurbo
+    from mflux.callbacks.instances.memory_saver import MemorySaver
 
     # Optional: Try to import ControlnetUtil
     try:
@@ -45,15 +48,18 @@ except ImportError:
     Flux1Fill = None
     Flux1Depth = None
     Flux1Redux = None
+    FIBO = None
+    QwenImage = None
     ZImageTurbo = None
     ModelConfig = None
     CallbackRegistry = None
     ControlnetUtil = None
+    MemorySaver = None
 
 from .Mflux_Pro import MfluxControlNetPipeline
 
 # Cache for loaded models
-flux_cache = {}
+model_cache = {}
 
 DEFAULT_CONTROLNET_MODELS = [
     "InstantX/FLUX.1-dev-Controlnet-Canny",
@@ -66,7 +72,6 @@ def get_available_controlnet_models() -> list[str]:
         return DEFAULT_CONTROLNET_MODELS.copy()
 
     try:
-        # Attempt to discover models from mflux config if available
         model_cfg = import_module("mflux.config.model_config")
         available = getattr(model_cfg, "AVAILABLE_MODELS", {})
         models = []
@@ -84,7 +89,6 @@ class ComfyUIProgressBarCallback:
         self.pbar = comfy.utils.ProgressBar(total_steps)
 
     def call_in_loop(self, t, **kwargs):
-        # Update ComfyUI progress bar by 1 step
         self.pbar.update(1)
 
 def _get_mflux_version() -> str:
@@ -94,10 +98,10 @@ def _get_mflux_version() -> str:
     except Exception:
         return 'unknown'
 
-def is_third_party_model(model_name: str) -> bool:
+def is_third_party_model(model_string: str) -> bool:
     """Check if the model name looks like a third-party HF repo."""
-    prefixes = ["filipstrand/", "akx/", "Freepik/", "shuttleai/", "Tongyi-MAI/"]
-    return any(str(model_name).startswith(p) for p in prefixes)
+    prefixes = ["filipstrand/", "akx/", "Freepik/", "shuttleai/", "Tongyi-MAI/", "dhairyashil/", "briaai/"]
+    return any(str(model_string).startswith(p) for p in prefixes)
 
 def infer_quant_bits(name: str | None) -> int | None:
     if not name:
@@ -110,44 +114,75 @@ def infer_quant_bits(name: str | None) -> int | None:
         return 4
     return None
 
-def load_or_create_flux(model_name, quantize, path, lora_paths, lora_scales, variant="txt2img", controlnet_path=None, base_model="dev"):
+def load_or_create_model(model_string, quantize, model_path, lora_paths, lora_scales, variant="txt2img", controlnet_path=None, base_model_hint="dev"):
     """
-    Create or fetch a cached Flux model variant.
+    Load or create a model instance (Flux, FIBO, Qwen, Z-Image) based on unified logic.
+    `model_string` can be an alias (e.g., "schnell", "qwen") or a path/HF ID.
+    `base_model_hint` is used to disambiguate or force a specific model type.
     """
-    if Flux1 is None:
+    if not (Flux1 or FIBO or QwenImage or ZImageTurbo):
         raise ImportError("MFlux is not installed or failed to load.")
 
-    effective_model_path = path if path else None
+    effective_model_path = model_path if model_path else None
 
     if effective_model_path and quantize is None:
         quantize = infer_quant_bits(effective_model_path)
 
-    # Cache key includes variant and controlnet_path
-    key = (model_name, quantize, effective_model_path, tuple(lora_paths), tuple(lora_scales), variant, controlnet_path, base_model)
+    # Cache key needs to be comprehensive for different model types
+    key = (model_string, quantize, effective_model_path, tuple(lora_paths), tuple(lora_scales), variant, controlnet_path, base_model_hint)
+    if key not in model_cache:
+        model_cache.clear() # Clear cache to save VRAM
 
-    if key not in flux_cache:
-        flux_cache.clear() # Clear cache to save VRAM
+        print(f"[MFlux-ComfyUI] Loading model: '{model_string}' (Hint: {base_model_hint}, Variant: {variant})")
 
-        print(f"[MFlux-ComfyUI] Loading model: {model_name} (Base: {base_model}, Variant: {variant})")
+        # Determine target class and config_base_model string
+        target_class = None
+        config_base_model_name = None
+
+        if base_model_hint == "qwen":
+            target_class = QwenImage
+            config_base_model_name = "qwen-image"
+        elif base_model_hint == "fibo":
+            target_class = FIBO
+            config_base_model_name = "fibo"
+        elif base_model_hint == "z-image-turbo":
+            target_class = ZImageTurbo
+            config_base_model_name = "z-image-turbo"
+        else: # Default to Flux or derive from model_string
+            if "z-image" in str(model_string).lower() or base_model_hint == "z-image": # Fallback for z-image if hint is generic
+                target_class = ZImageTurbo
+                config_base_model_name = "z-image-turbo" # Default z-image config
+            elif "fibo" in str(model_string).lower():
+                target_class = FIBO
+                config_base_model_name = "fibo"
+            elif "qwen" in str(model_string).lower():
+                target_class = QwenImage
+                config_base_model_name = "qwen-image"
+            else: # Assume Flux
+                target_class = Flux1
+                config_base_model_name = base_model_hint # e.g. "dev", "schnell"
 
         # Resolve ModelConfig
-        # For Redux/Fill/Depth, we need specific configs
-        if variant == "fill":
-            model_config = ModelConfig.dev_fill() # Fill usually implies dev-fill
-        elif variant == "depth":
-            model_config = ModelConfig.dev_depth()
-        elif variant == "redux":
-            model_config = ModelConfig.dev_redux()
-        elif variant == "controlnet":
-            # If using standard canny, use the preset, otherwise generic dev
-            if controlnet_path == "InstantX/FLUX.1-dev-Controlnet-Canny":
-                model_config = ModelConfig.dev_controlnet_canny()
-            elif "upscaler" in str(controlnet_path).lower():
-                model_config = ModelConfig.dev_controlnet_upscaler()
-            else:
-                model_config = ModelConfig.from_name(model_name, base_model=base_model)
-        else:
-            model_config = ModelConfig.from_name(model_name, base_model=base_model)
+        # For specific Flux variants (Fill, Depth, Redux, ControlNet)
+        if target_class == Flux1: # Only apply variant configs to Flux
+            if variant == "fill":
+                model_config = ModelConfig.dev_fill()
+            elif variant == "depth":
+                model_config = ModelConfig.dev_depth()
+            elif variant == "redux":
+                model_config = ModelConfig.dev_redux()
+            elif variant == "controlnet":
+                if controlnet_path == "InstantX/FLUX.1-dev-Controlnet-Canny":
+                    model_config = ModelConfig.dev_controlnet_canny()
+                elif "upscaler" in str(controlnet_path).lower():
+                    model_config = ModelConfig.dev_controlnet_upscaler()
+                else:
+                    model_config = ModelConfig.from_name(model_string, base_model=config_base_model_name)
+            else: # Standard txt2img Flux
+                model_config = ModelConfig.from_name(model_string, base_model=config_base_model_name)
+        else: # For FIBO, Qwen, Z-Image - use the resolved base_model_name
+            model_config = ModelConfig.from_name(model_string, base_model=config_base_model_name)
+
 
         common_args = {
             "quantize": quantize,
@@ -156,58 +191,38 @@ def load_or_create_flux(model_name, quantize, path, lora_paths, lora_scales, var
             "lora_scales": lora_scales,
         }
 
-        # Instantiate the correct class
-        if "z-image" in str(model_name).lower() or "z-image" in str(base_model).lower():
-             # Z-Image Turbo handling
-             flux = ZImageTurbo(model_config=model_config, **common_args)
-        elif variant == "fill":
-            flux = Flux1Fill(model_config=model_config, **common_args)
-        elif variant == "depth":
-            flux = Flux1Depth(model_config=model_config, **common_args)
-        elif variant == "redux":
-            flux = Flux1Redux(model_config=model_config, **common_args)
-        elif variant == "controlnet":
-            # ControlNet needs the specific controlnet path if it's not the default in config
-            # But mflux 0.13.1 Flux1Controlnet constructor doesn't take controlnet_path arg directly
-            # if it's defined in model_config. However, for custom ones, we might need to handle it.
-            # For now, we assume the ModelConfig handles the mapping or we use the default.
-            flux = Flux1Controlnet(model_config=model_config, **common_args)
-        else:
-            flux = Flux1(model_config=model_config, **common_args)
+        instance = target_class(model_config=model_config, **common_args)
+        model_cache[key] = instance
+        print(f"[MFlux-ComfyUI] Loaded {target_class.__name__} for '{model_string}'.")
 
-        flux_cache[key] = flux
+    return model_cache[key]
 
-    return flux_cache[key]
-
-def get_lora_info(Loras):
-    if Loras:
-        return Loras.lora_paths, Loras.lora_scales
+def get_lora_info(loras_pipeline):
+    if loras_pipeline and hasattr(loras_pipeline, 'lora_paths') and hasattr(loras_pipeline, 'lora_scales'):
+        return loras_pipeline.lora_paths, loras_pipeline.lora_scales
     return [], []
 
-def generate_image(prompt, model, seed, width, height, steps, guidance, quantize="None", metadata=True, Local_model="", image=None, Loras=None, ControlNet=None, base_model="dev", low_ram=False, vae_tiling=False, vae_tiling_split="horizontal", masked_image_path=None, depth_image_path=None, redux_image_paths=None, redux_image_strengths=None):
-
-    # 1. Resolve Model Name
-    model_resolved = model
-    if Local_model:
-        if "schnell" in str(Local_model).lower():
-            model_resolved = "schnell"
-        elif "dev" in str(Local_model).lower():
-            model_resolved = "dev"
-        elif "z-image" in str(Local_model).lower():
-            model_resolved = "z-image-turbo"
-
-    # If user selected the specific 4-bit repo in the dropdown, ensure we treat it as z-image
-    if "z-image" in str(model).lower():
-        model_resolved = model
+def generate_image(prompt, model_string, seed, width, height, steps, guidance, quantize="None", metadata=True,
+                   model_path=None, img2img_pipeline=None, loras_pipeline=None, controlnet_pipeline=None,
+                   base_model_hint="dev", negative_prompt="", optimizations=None,
+                   masked_image_path=None, depth_image_path=None, redux_image_paths=None,
+                   redux_image_strengths=None):
 
     q_val = None if quantize in (None, "None") else int(quantize)
-    lora_paths, lora_scales = get_lora_info(Loras)
+    lora_paths, lora_scales = get_lora_info(loras_pipeline)
 
-    # 2. Determine Variant and ControlNet settings
+    # Determine variant and ControlNet settings
     variant = "txt2img"
     controlnet_path = None
     controlnet_strength = 1.0
     controlnet_image_path = None
+    img2img_image_obj = None # For MfluxImg2ImgPipeline object
+    img2img_strength = None
+
+    if img2img_pipeline:
+        variant = "img2img" # Consider img2img as a variant
+        img2img_image_obj = img2img_pipeline # Pass the whole pipeline object
+        img2img_strength = img2img_pipeline.image_strength
 
     if masked_image_path:
         variant = "fill"
@@ -215,25 +230,25 @@ def generate_image(prompt, model, seed, width, height, steps, guidance, quantize
         variant = "depth"
     elif redux_image_paths:
         variant = "redux"
-    elif ControlNet is not None and isinstance(ControlNet, MfluxControlNetPipeline):
+    elif controlnet_pipeline is not None and isinstance(controlnet_pipeline, MfluxControlNetPipeline):
         variant = "controlnet"
-        controlnet_path = ControlNet.model_selection
-        controlnet_strength = float(ControlNet.control_strength)
-        controlnet_image_path = ControlNet.control_image_path
+        controlnet_path = controlnet_pipeline.model_selection
+        controlnet_strength = float(controlnet_pipeline.control_strength)
+        controlnet_image_path = controlnet_pipeline.control_image_path
 
-    # 3. Load Model
-    flux = load_or_create_flux(
-        model_name=model_resolved,
+    # Load Model
+    model_instance = load_or_create_model(
+        model_string=model_string,
         quantize=q_val,
-        path=Local_model if Local_model else None,
+        model_path=model_path,
         lora_paths=lora_paths,
         lora_scales=lora_scales,
         variant=variant,
         controlnet_path=controlnet_path,
-        base_model=base_model
+        base_model_hint=base_model_hint
     )
 
-    # 4. Prepare Generation Arguments
+    # Prepare Generation Arguments
     seed_val = int(seed) if seed != -1 else random.randint(0, 0xffffffffffffffff)
 
     gen_kwargs = {
@@ -242,28 +257,25 @@ def generate_image(prompt, model, seed, width, height, steps, guidance, quantize
         "num_inference_steps": steps,
         "height": height,
         "width": width,
-        "guidance": guidance,
-        # Restore parameters that were ignored in previous version
-        # Note: Backend support for low_ram/vae_tiling varies by version,
-        # but passing them is better than ignoring them.
-        "low_ram": low_ram,
-        "vae_tiling": vae_tiling,
-        "vae_tiling_split": vae_tiling_split,
     }
 
-    # Z-Image Turbo does not accept 'guidance'
-    # Check if ZImageTurbo class is available (it might be None in CI/no-mflux envs)
-    if ZImageTurbo is not None and isinstance(flux, ZImageTurbo):
-        if "guidance" in gen_kwargs:
-            del gen_kwargs["guidance"]
+    # Model-specific argument routing
+    if isinstance(model_instance, QwenImage):
+        gen_kwargs["negative_prompt"] = negative_prompt
+    elif isinstance(model_instance, ZImageTurbo):
+        if "guidance" in gen_kwargs: del gen_kwargs["guidance"] # Z-Image doesn't use guidance
+    elif isinstance(model_instance, (Flux1, Flux1Fill, Flux1Depth, Flux1Redux, Flux1Controlnet, FIBO)):
+        gen_kwargs["guidance"] = guidance
+    else: # Fallback for any other model type
+        gen_kwargs["guidance"] = guidance
+
 
     # Add variant-specific arguments
     if variant == "fill":
-        # Flux1Fill requires image_path and masked_image_path
-        if image: gen_kwargs["image_path"] = image.image_path
+        if img2img_image_obj: gen_kwargs["image_path"] = img2img_image_obj.image_path # For fill, source image
         gen_kwargs["masked_image_path"] = masked_image_path
     elif variant == "depth":
-        if image: gen_kwargs["image_path"] = image.image_path
+        if img2img_image_obj: gen_kwargs["image_path"] = img2img_image_obj.image_path # For depth, source image
         gen_kwargs["depth_image_path"] = depth_image_path
     elif variant == "redux":
         gen_kwargs["redux_image_paths"] = redux_image_paths
@@ -272,43 +284,53 @@ def generate_image(prompt, model, seed, width, height, steps, guidance, quantize
     elif variant == "controlnet":
         gen_kwargs["controlnet_image_path"] = controlnet_image_path
         gen_kwargs["controlnet_strength"] = controlnet_strength
-    else:
-        # Standard txt2img / img2img
-        if image:
-            gen_kwargs["image_path"] = image.image_path
-            gen_kwargs["image_strength"] = image.image_strength
+    elif variant == "img2img": # Standard img2img
+        if img2img_image_obj:
+            gen_kwargs["image_path"] = img2img_image_obj.image_path
+            gen_kwargs["image_strength"] = img2img_strength
+    # else: # txt2img, no extra args beyond common ones
 
-    print(f"[MFlux-ComfyUI] Generating ({variant}) seed: {seed_val}, steps: {steps}, dims: {width}x{height}")
+    print(f"[MFlux-ComfyUI] Generating with {model_instance.__class__.__name__} ({variant}) seed: {seed_val}, steps: {steps}")
 
-    # 5. Register Progress Bar Callback
+    # Register Progress Bar Callback
     if CallbackRegistry:
-        flux.callbacks = CallbackRegistry()
+        model_instance.callbacks = CallbackRegistry()
         pbar = ComfyUIProgressBarCallback(total_steps=steps)
-        flux.callbacks.register(pbar)
+        model_instance.callbacks.register(pbar)
 
-    # 6. Generate
+    # Apply Optimizations
+    low_ram = optimizations.get("low_ram", False) if optimizations else False
+    vae_tiling = optimizations.get("vae_tiling", False) if optimizations else False
+    vae_tiling_split = optimizations.get("vae_tiling_split", "horizontal") if optimizations else "horizontal"
+
+    if isinstance(model_instance, Flux1) and vae_tiling: # Apply VAE tiling only to Flux
+        model_instance.vae.decoder.enable_tiling = True
+        model_instance.vae.decoder.split_direction = vae_tiling_split
+        print(f"[MFlux-ComfyUI] VAE tiling enabled: {vae_tiling_split}")
+
+    if low_ram and MemorySaver:
+        # MemorySaver needs the model instance
+        memory_saver = MemorySaver(model=model_instance, keep_transformer=True, cache_limit_bytes=1000**3)
+        model_instance.callbacks.register(memory_saver)
+        print("[MFlux-ComfyUI] Low RAM optimization (MemorySaver) enabled.")
+
+    # Generate
     try:
-        generated_result = flux.generate_image(**gen_kwargs)
-    except TypeError as e:
-        # Retry without advanced kwargs if backend rejects them
-        if "unexpected keyword argument" in str(e):
-            print(f"[MFlux-ComfyUI] Warning: Backend rejected some arguments ({e}). Retrying with basics...")
-            for k in ["low_ram", "vae_tiling", "vae_tiling_split"]:
-                if k in gen_kwargs:
-                    del gen_kwargs[k]
-            generated_result = flux.generate_image(**gen_kwargs)
-        else:
-            raise e
+        # Pass optimizations to gen_kwargs if the backend supports them directly (though we handle them above)
+        # This is a fallback if the backend ever changes to handle them internally.
+        # For now, we apply them directly to the model instance.
+        # gen_kwargs["low_ram"] = low_ram # Already handled by MemorySaver
+        # gen_kwargs["vae_tiling"] = vae_tiling # Already handled by Flux.vae.decoder
+        generated_result = model_instance.generate_image(**gen_kwargs)
     except Exception as e:
         print(f"[MFlux-ComfyUI] Error during generation: {e}")
         raise e
 
-    # 7. Process Output
-    # Handle different return types from mflux versions (object with .image or raw)
+    # Process Output
     if hasattr(generated_result, "image"):
         pil_image = generated_result.image
     else:
-        pil_image = generated_result
+        pil_image = generated_result # Assume PIL Image if not an object
 
     image_np = np.array(pil_image).astype(np.float32) / 255.0
     image_tensor = torch.from_numpy(image_np)
@@ -318,7 +340,12 @@ def generate_image(prompt, model, seed, width, height, steps, guidance, quantize
 
     return (image_tensor,)
 
-def save_images_with_metadata(images, prompt, model, quantize, Local_model, seed, height, width, steps, guidance, lora_paths, lora_scales, image_path, image_strength, filename_prefix="Mflux", full_prompt=None, extra_pnginfo=None, base_model=None, low_ram=False, control_image_path=None, control_strength=None, control_model=None, quantize_effective=None, vae_tiling=False, vae_tiling_split="horizontal"):
+def save_images_with_metadata(images, prompt, model_alias, quantize, model_path, seed, height, width, steps, guidance,
+                             lora_paths, lora_scales, image_path, image_strength, filename_prefix="Mflux",
+                             full_prompt=None, extra_pnginfo=None, base_model_hint=None, negative_prompt_used="",
+                             vae_tiling=False, vae_tiling_split="horizontal",
+                             control_image_path=None, control_strength=None, control_model=None,
+                             quantize_effective=None):
 
     output_dir = folder_paths.get_output_directory()
     full_output_folder, filename, counter, subfolder, filename_prefix = folder_paths.get_save_image_path(
@@ -335,8 +362,8 @@ def save_images_with_metadata(images, prompt, model, quantize, Local_model, seed
     counter = max(existing_counters, default=0) + 1
 
     results = list()
-    for image in images:
-        i = 255. * image.cpu().numpy().squeeze()
+    for image_tensor in images: # Renamed from 'image' to 'image_tensor' for clarity
+        i = 255. * image_tensor.cpu().numpy().squeeze()
         img = Image.fromarray(np.clip(i, 0, 255).astype(np.uint8))
 
         metadata = PngInfo()
@@ -358,8 +385,8 @@ def save_images_with_metadata(images, prompt, model, quantize, Local_model, seed
         metadata_jsonfile = os.path.join(mflux_output_folder, f"{filename_prefix}_{counter:05}.json")
         json_dict = {
             "prompt": prompt,
-            "model": model,
-            "base_model": base_model,
+            "model_alias": model_alias, # Store the alias/path string used for generation
+            "base_model_hint": base_model_hint, # Store the base model hint (e.g., "dev", "qwen")
             "quantize": quantize,
             "quantize_effective": quantize_effective,
             "seed": seed,
@@ -367,8 +394,8 @@ def save_images_with_metadata(images, prompt, model, quantize, Local_model, seed
             "width": width,
             "steps": steps,
             "guidance": guidance,
-            "Local_model": Local_model,
-            "image_path": image_path,
+            "model_path": model_path, # Store the resolved model path
+            "image_path": image_path, # For img2img or fill
             "image_strength": image_strength,
             "lora_paths": lora_paths,
             "lora_scales": lora_scales,
@@ -379,8 +406,8 @@ def save_images_with_metadata(images, prompt, model, quantize, Local_model, seed
             "depth_image_path": extra_pnginfo.get("depth_image_path") if extra_pnginfo else None,
             "redux_image_paths": extra_pnginfo.get("redux_image_paths") if extra_pnginfo else None,
             "mflux_version": _get_mflux_version(),
-            "low_ram": low_ram,
-            "vae_tiling": vae_tiling,
+            "negative_prompt_used": negative_prompt_used, # Store if negative prompt was used
+            "vae_tiling": vae_tiling, # Store vae tiling settings
             "vae_tiling_split": vae_tiling_split,
         }
         with open(metadata_jsonfile, 'w') as metadata_file:

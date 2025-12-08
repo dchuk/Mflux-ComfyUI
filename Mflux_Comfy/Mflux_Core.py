@@ -42,14 +42,18 @@ try:
         ControlnetUtil = None
 
 except ImportError:
-    Flux1 = None
-    Flux1Controlnet = None
-    Flux1Fill = None
-    Flux1Depth = None
-    Flux1Redux = None
-    FIBO = None
-    QwenImage = None
-    ZImageTurbo = None
+    # Define dummy classes so isinstance() checks don't fail in tests/CI
+    class _DummyModel: pass
+
+    Flux1 = _DummyModel
+    Flux1Controlnet = _DummyModel
+    Flux1Fill = _DummyModel
+    Flux1Depth = _DummyModel
+    Flux1Redux = _DummyModel
+    FIBO = _DummyModel
+    QwenImage = _DummyModel
+    ZImageTurbo = _DummyModel
+
     ModelConfig = None
     CallbackRegistry = None
     ControlnetUtil = None

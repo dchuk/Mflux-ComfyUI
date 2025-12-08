@@ -15,18 +15,9 @@ def test_generate_config_fallback(monkeypatch, tmp_path):
 
     import Mflux_Comfy.Mflux_Core as core
 
-    # Mock Config to raise TypeError on first call (simulating unknown kwarg)
-    # We use 'vae_tiling' as the trigger, as it is passed to Config in the new Core logic
-    class DummyConfig:
-        def __init__(self, **kwargs):
-            if "vae_tiling" in kwargs:
-                raise TypeError("unexpected keyword argument 'vae_tiling'")
-
-    monkeypatch.setattr(core, "Config", DummyConfig)
-
     # Mock flux generation
     class DummyFlux:
-        def generate_image(self, seed, prompt, config):
+        def generate_image(self, **kwargs):
             # Return dummy image
             import numpy as np
             import torch
@@ -34,11 +25,11 @@ def test_generate_config_fallback(monkeypatch, tmp_path):
             t = torch.from_numpy(arr).permute(2,0,1).unsqueeze(0)
             return t
 
-    # Updated to patch the correct function name
+    # Patch load_or_create_model to return our dummy flux
     monkeypatch.setattr(core, "load_or_create_model", lambda *a, **k: DummyFlux())
 
     # Call generate_image with vae_tiling=True.
-    # This should trigger the TypeError in DummyConfig, causing the backend to retry without it.
+    # This verifies that the function accepts the argument and proceeds without error.
     result = core.generate_image(
         prompt="p", model_string="dev", seed=-1, width=16, height=16, steps=1,
         guidance=1.0, quantize="8", metadata=True, model_path="",

@@ -382,7 +382,7 @@ class QuickMfluxNode:
                 negative_prompt_used=negative_prompt,
                 vae_tiling=vae_tiling,
                 vae_tiling_split=vae_tiling_split,
-                low_ram=low_ram # Added this
+                low_ram=low_ram
             )
 
         return generated_images
@@ -486,12 +486,15 @@ class MfluxZImageNode:
                 image_strength=image_strength,
                 lora_paths=lora_paths,
                 lora_scales=lora_scales,
+                control_image_path=None, # Z-Image doesn't support ControlNet
+                control_strength=None,
+                control_model=None,
                 full_prompt=full_prompt,
                 extra_pnginfo=extra_pnginfo,
                 base_model_hint="z-image-turbo",
                 negative_prompt_used="",
                 vae_tiling=vae_tiling,
                 vae_tiling_split=vae_tiling_split,
-                low_ram=low_ram # Added this
+                low_ram=low_ram
             )
         return generated_images

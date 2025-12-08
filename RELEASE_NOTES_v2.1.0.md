@@ -41,7 +41,7 @@ This release upgrades the backend to **mflux 0.13.1**, introducing a polymorphic
 
 ## Known limitations
 - ControlNet support is currently best‑effort (depends on backend build).
-- Z-Image Turbo requires downloading ~12GB of weights (for 4-bit) on the first run.
+- Z-Image Turbo requires downloading ~6GB of weights (for 4-bit) on the first run.
 
 ## Thanks
 - mflux by @filipstrand and contributors

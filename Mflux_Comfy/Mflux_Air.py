@@ -50,6 +50,16 @@ def download_hg_model(model_version, force_redownload=False):
     snapshot_download(repo_id=repo_id, local_dir=model_checkpoint, local_dir_use_symlinks=False)
     return model_checkpoint
 
+# Helper to detect if a directory looks like a model root
+def is_model_directory(path):
+    # Indicators that a folder is a model root, not just a container
+    indicators = ["config.json", "transformer", "vae", "text_encoder", "text_encoder_2", "model_index.json"]
+    try:
+        items = os.listdir(path)
+        return any(item in items for item in indicators)
+    except Exception:
+        return False
+
 class MfluxOptimizations:
     @classmethod
     def INPUT_TYPES(cls):
@@ -180,11 +190,16 @@ class MfluxModelsLoader:
     def INPUT_TYPES(cls):
         model_paths = []
         if os.path.exists(mflux_dir):
-            try:
-                # List all directories without filtering
-                model_paths = [f.name for f in os.scandir(mflux_dir) if f.is_dir()]
-            except OSError:
-                pass
+            # Recursively walk the directory to find model roots
+            for root, dirs, files in os.walk(mflux_dir):
+                if is_model_directory(root):
+                    # Get the path relative to the Mflux root (e.g., "filipstrand/Z-Image-Turbo-mflux-4bit")
+                    rel_path = os.path.relpath(root, mflux_dir)
+                    model_paths.append(rel_path)
+                    # Stop recursing into this directory (don't list 'vae', 'transformer' as models)
+                    dirs[:] = []
+
+        model_paths.sort(key=str.lower)
 
         # Add common aliases for convenience
         available_aliases = ["dev", "schnell", "qwen", "fibo", "z-image-turbo"]
@@ -193,8 +208,6 @@ class MfluxModelsLoader:
         for path_name in model_paths:
             if path_name not in final_options:
                 final_options.append(path_name)
-
-        final_options.sort()
 
         return {
             "required": {
@@ -217,9 +230,11 @@ class MfluxModelsLoader:
             return (free_path,)
 
         if model_name and model_name != "None":
+            # If it's a known alias, return it directly
             if model_name in ["dev", "schnell", "qwen", "fibo", "z-image-turbo"]:
                 return (model_name,)
 
+            # Otherwise, construct the full path from the relative path
             full_path = get_full_model_path(mflux_dir, model_name)
             if os.path.exists(full_path):
                 return (full_path,)

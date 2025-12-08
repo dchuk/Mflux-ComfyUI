@@ -3,7 +3,7 @@
 Short description:
 > ComfyUI nodes for mflux 0.13.1 (Apple Silicon/MLX). Quick txt2img/img2img with LoRA and ControlNet canny, HF repo support, and metadata saving; keeps legacy graph compatibility. Introduces support for the high-speed Z-Image Turbo model.
 
-PublisherId: rurounigit
+PublisherId: joonsoome
 DisplayName: Mflux-ComfyUI 2.1.0
 Icon: assets/icon.svg
 
@@ -13,8 +13,9 @@ Screenshots (recommended):
 - examples/Pro_Loras.png (LoRA)
 - examples/Pro_ControlNet.png (ControlNet)
 - examples/Mflux_Metadata.png (metadata)
-- examples/Air_Mflux_Z-Image_Turbo.png (Z-Image Turbo)
-- examples/Air_Mflux_Z-Image_Turbo_img2img_lora.png (Z-Image Turbo with img2img and LoRA)
+- examples/Air_Z-Image-Turbo.png (Z-Image Turbo)
+- examples/Air_Z-Image-Turbo_model_loader.png (Z-Image Turbo with Model Loader)
+- examples/Air_Z-Image-Turbo_img2img_lora.png (Z-Image Turbo with img2img and LoRA))
 
 
 Notes:

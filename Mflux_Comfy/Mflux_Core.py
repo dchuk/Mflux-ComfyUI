@@ -55,6 +55,7 @@ except ImportError:
     ControlnetUtil = None
     MemorySaver = None
 
+    # Stub for tests where mflux is not installed
     class _StubConfig(dict):
         def __init__(self, **kwargs):
             super().__init__(**kwargs)
@@ -196,7 +197,7 @@ def load_or_create_model(model_string, quantize, model_path, lora_paths, lora_sc
             model_config = ModelConfig.from_name(model_string, base_model=config_base_model_name)
 
         common_args = {
-            "quantize": quantize, # Pass None if Auto
+            "quantize": quantize,
             "model_path": effective_model_path,
             "lora_paths": lora_paths,
             "lora_scales": lora_scales,
@@ -215,13 +216,10 @@ def get_lora_info(loras_pipeline):
 
 def generate_image(prompt, model_string, seed, width, height, steps, guidance, quantize="None", metadata=True,
                    model_path=None, img2img_pipeline=None, loras_pipeline=None, controlnet_pipeline=None,
-                   base_model_hint="dev", negative_prompt="", optimizations=None,
-                   masked_image_path=None, depth_image_path=None, redux_image_paths=None,
-                   redux_image_strengths=None, low_ram=False, vae_tiling=False, vae_tiling_split="horizontal"):
+                   base_model_hint="dev", negative_prompt="", low_ram=False, vae_tiling=False, vae_tiling_split="horizontal",
+                   masked_image_path=None, depth_image_path=None, redux_image_paths=None, redux_image_strengths=None):
 
-    # Handle "Auto" or "None" string from UI -> None for backend
     q_val = None if quantize in (None, "None", "Auto") else int(quantize)
-
     lora_paths, lora_scales = get_lora_info(loras_pipeline)
 
     variant = "txt2img"
@@ -332,12 +330,10 @@ def generate_image(prompt, model_string, seed, width, height, steps, guidance, q
 
     return (image_tensor,)
 
-def save_images_with_metadata(images, prompt, model_alias, quantize, model_path, seed, height, width, steps, guidance,
-                             lora_paths, lora_scales, image_path, image_strength, filename_prefix="Mflux",
+def save_images_with_metadata(images, prompt, model_alias, quantize, quantize_effective, model_path, seed, height, width, steps, guidance,
+                             image_path, image_strength, lora_paths, lora_scales, control_image_path, control_strength, control_model,
                              full_prompt=None, extra_pnginfo=None, base_model_hint=None, negative_prompt_used="",
-                             vae_tiling=False, vae_tiling_split="horizontal",
-                             control_image_path=None, control_strength=None, control_model=None,
-                             quantize_effective=None):
+                             vae_tiling=False, vae_tiling_split="horizontal", low_ram=False):
 
     output_dir = folder_paths.get_output_directory()
     full_output_folder, filename, counter, subfolder, filename_prefix = folder_paths.get_save_image_path(

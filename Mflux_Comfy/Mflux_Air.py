@@ -311,6 +311,11 @@ class QuickMfluxNode:
 
     def generate(self, prompt, model, seed, width, height, steps, guidance, quantize="Auto", metadata=True, img2img=None, Loras=None, ControlNet=None, base_model="dev", negative_prompt="", optimizations=None, model_input=None, Local_model=None, full_prompt=None, extra_pnginfo=None, size_preset="Custom", apply_size_preset=True, quality_preset="Balanced (25 steps)", apply_quality_preset=True, randomize_seed=True):
 
+        # Safety check for empty prompt to prevent backend crash
+        if not prompt or not prompt.strip():
+            print("[MFlux-ComfyUI] Warning: Empty prompt detected. Using fallback '.' to prevent backend crash.")
+            prompt = "."
+
         # Priority: 1. model input (new dock), 2. Local_model (legacy dock), 3. model (text widget)
         final_model = model
         if model_input and isinstance(model_input, str) and model_input.strip():
@@ -427,6 +432,11 @@ class MfluxZImageNode:
     FUNCTION = "generate"
 
     def generate(self, prompt, model, seed, width, height, steps, metadata=True, quantize="Auto", Loras=None, img2img=None, optimizations=None, model_input=None, Local_model=None, full_prompt=None, extra_pnginfo=None):
+
+        # Safety check for empty prompt to prevent backend crash
+        if not prompt or not prompt.strip():
+            print("[MFlux-ComfyUI] Warning: Empty prompt detected. Using fallback '.' to prevent backend crash.")
+            prompt = "."
 
         # Priority: 1. model input, 2. Local_model, 3. model
         final_model = model

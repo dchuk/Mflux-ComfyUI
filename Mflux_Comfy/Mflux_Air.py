@@ -20,9 +20,10 @@ except ImportError:
     MemorySaver = None
 
 try:
-    from huggingface_hub import snapshot_download
+    from huggingface_hub import snapshot_download, scan_cache_dir
 except ImportError:
     snapshot_download = None
+    scan_cache_dir = None
 
 def create_directory(directory):
     if not os.path.exists(directory):
@@ -52,13 +53,23 @@ def download_hg_model(model_version, force_redownload=False):
 
 # Helper to detect if a directory looks like a model root
 def is_model_directory(path):
-    # Indicators that a folder is a model root, not just a container
     indicators = ["config.json", "transformer", "vae", "text_encoder", "text_encoder_2", "model_index.json"]
     try:
         items = os.listdir(path)
         return any(item in items for item in indicators)
     except Exception:
         return False
+
+# Helper to get a set of cached repo IDs
+def get_cached_repos():
+    if scan_cache_dir is None:
+        return set()
+    try:
+        cache_info = scan_cache_dir()
+        # Return a set of repo_ids (e.g., "black-forest-labs/FLUX.1-schnell")
+        return {repo.repo_id for repo in cache_info.repos}
+    except Exception:
+        return set()
 
 class MfluxOptimizations:
     @classmethod
@@ -89,7 +100,7 @@ class MfluxModelsDownloader:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "model_version": ([
+                "model": ([
                     "dhairyashil/FLUX.1-schnell-mflux-v0.6.2-4bit",
                     "dhairyashil/FLUX.1-dev-mflux-4bit",
                     "filipstrand/FLUX.1-Krea-dev-mflux-4bit",
@@ -106,12 +117,12 @@ class MfluxModelsDownloader:
         }
 
     RETURN_TYPES = ("STRING",)
-    RETURN_NAMES = ("model_string",)
+    RETURN_NAMES = ("downloaded_model",)
     CATEGORY = "MFlux/Air"
     FUNCTION = "download_model"
 
-    def download_model(self, model_version, force_redownload=False):
-        model_path = download_hg_model(model_version, force_redownload=force_redownload)
+    def download_model(self, model, force_redownload=False):
+        model_path = download_hg_model(model, force_redownload=force_redownload)
         return (model_path,)
 
 class MfluxCustomModels:
@@ -188,59 +199,76 @@ class MfluxCustomModels:
 class MfluxModelsLoader:
     @classmethod
     def INPUT_TYPES(cls):
-        model_paths = []
+        # 1. Find Local Models (Recursive)
+        local_models = []
         if os.path.exists(mflux_dir):
-            # Recursively walk the directory to find model roots
             for root, dirs, files in os.walk(mflux_dir):
                 if is_model_directory(root):
-                    # Get the path relative to the Mflux root (e.g., "filipstrand/Z-Image-Turbo-mflux-4bit")
                     rel_path = os.path.relpath(root, mflux_dir)
-                    model_paths.append(rel_path)
-                    # Stop recursing into this directory (don't list 'vae', 'transformer' as models)
-                    dirs[:] = []
+                    # Add Folder Icon
+                    local_models.append(f"📁 {rel_path}")
+                    dirs[:] = [] # Stop recursing
+        local_models.sort(key=str.lower)
 
-        model_paths.sort(key=str.lower)
+        # 2. Check System Cache for Aliases
+        cached_repos = get_cached_repos()
 
-        # Add common aliases for convenience
-        available_aliases = ["dev", "schnell", "qwen", "fibo", "z-image-turbo"]
-        final_options = available_aliases.copy()
+        # Map aliases to their underlying HF Repo IDs to check existence
+        # Note: These mappings are based on mflux defaults
+        alias_map = {
+            "dev": "black-forest-labs/FLUX.1-dev",
+            "schnell": "black-forest-labs/FLUX.1-schnell",
+            "qwen": "filipstrand/Qwen-Image-mflux-6bit", # Common default
+            "fibo": "briaai/Fibo-mlx-8bit", # Common default
+            "z-image-turbo": "filipstrand/Z-Image-Turbo-mflux-4bit"
+        }
 
-        for path_name in model_paths:
-            if path_name not in final_options:
-                final_options.append(path_name)
+        alias_options = []
+        for alias in ["dev", "schnell", "qwen", "fibo", "z-image-turbo"]:
+            repo_id = alias_map.get(alias, "")
+            # Check if the repo ID exists in cache
+            if repo_id in cached_repos:
+                alias_options.append(f"🟢 {alias}")
+            else:
+                alias_options.append(f"☁️ {alias}")
+
+        final_options = alias_options + local_models
 
         return {
             "required": {
-                "model_name": (final_options or ["None"], {"default": "schnell"}),
+                "model": (final_options or ["None"], {"default": final_options[0] if final_options else "None", "tooltip": "🟢 = Cached (Ready)\n📁 = Local (ComfyUI/models/Mflux)\n☁️ = Not Cached (Will Download)"}),
             },
             "optional": {
-                "free_path": ("STRING", {"default": ""}),
+                "free_path": ("STRING", {"default": "", "tooltip": "Manually input an absolute model path to override the selection above."}),
             }
         }
 
     RETURN_TYPES = ("STRING",)
-    RETURN_NAMES = ("model_string",)
+    RETURN_NAMES = ("model_to_load",)
     CATEGORY = "MFlux/Air"
     FUNCTION = "load"
 
-    def load(self, model_name="", free_path=""):
+    def load(self, model="", free_path=""):
         if free_path:
             if not os.path.exists(free_path):
                 raise ValueError(f"Path does not exist: {free_path}")
             return (free_path,)
 
-        if model_name and model_name != "None":
-            # If it's a known alias, return it directly
-            if model_name in ["dev", "schnell", "qwen", "fibo", "z-image-turbo"]:
-                return (model_name,)
+        if model and model != "None":
+            # Clean up the visual indicators
+            clean_name = model.replace("🟢 ", "").replace("📁 ", "").replace("☁️ ", "")
 
-            # Otherwise, construct the full path from the relative path
-            full_path = get_full_model_path(mflux_dir, model_name)
-            if os.path.exists(full_path):
-                return (full_path,)
-            else:
-                print(f"Warning: Local model path {full_path} not found. Passing model name '{model_name}' as string.")
-                return (model_name,)
+            # If it was a local folder (📁), resolve full path
+            if "📁 " in model:
+                full_path = get_full_model_path(mflux_dir, clean_name)
+                if os.path.exists(full_path):
+                    return (full_path,)
+                else:
+                    print(f"Warning: Local model path {full_path} not found. Passing name '{clean_name}' as string.")
+                    return (clean_name,)
+
+            # If it was an alias (🟢 or ☁️), return the alias string
+            return (clean_name,)
 
         return ("",)
 

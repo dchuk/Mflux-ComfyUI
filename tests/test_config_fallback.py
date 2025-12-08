@@ -34,7 +34,8 @@ def test_generate_config_fallback(monkeypatch, tmp_path):
             t = torch.from_numpy(arr).permute(2,0,1).unsqueeze(0)
             return t
 
-    monkeypatch.setattr(core, "load_or_create_flux", lambda *a, **k: DummyFlux())
+    # Updated to patch the correct function name
+    monkeypatch.setattr(core, "load_or_create_model", lambda *a, **k: DummyFlux())
 
     # Call generate_image with vae_tiling=True.
     # This should trigger the TypeError in DummyConfig, causing the backend to retry without it.

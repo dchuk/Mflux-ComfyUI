@@ -332,7 +332,7 @@ def generate_image(prompt, model_string, seed, width, height, steps, guidance, q
 
 def save_images_with_metadata(images, prompt, model_alias, quantize, quantize_effective, model_path, seed, height, width, steps, guidance,
                              image_path, image_strength, lora_paths, lora_scales, control_image_path, control_strength, control_model,
-                             full_prompt=None, extra_pnginfo=None, base_model_hint=None, negative_prompt_used="",
+                             filename_prefix="Mflux", full_prompt=None, extra_pnginfo=None, base_model_hint=None, negative_prompt_used="",
                              vae_tiling=False, vae_tiling_split="horizontal", low_ram=False):
 
     output_dir = folder_paths.get_output_directory()

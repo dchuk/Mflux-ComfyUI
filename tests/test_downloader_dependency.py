@@ -31,7 +31,8 @@ def test_download_logic(monkeypatch, tmp_path):
     monkeypatch.setattr(mflux_air, "mflux_dir", str(tmp_path))
 
     model_name = "flux.1-schnell-mflux-4bit"
-    expected_repo_id = "madroid/flux.1-schnell-mflux-4bit"
+    # Since legacy mapping is removed, the repo_id is the model_name itself
+    expected_repo_id = "flux.1-schnell-mflux-4bit"
 
     # Instantiate the Node
     downloader = mflux_air.MfluxModelsDownloader()

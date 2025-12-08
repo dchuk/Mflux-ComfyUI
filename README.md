@@ -7,8 +7,6 @@
 
 ## Overview
 
-This fork upgrades the original nodes to use **mflux 0.13.1** while keeping ComfyUI workflow compatibility. It leverages the new unified architecture of mflux 0.13.x to support standard FLUX generation as well as specialized variants like Fill, Depth, Redux, and Z-Image Turbo.
-
 - **Backend**: mflux 0.13.1 (requires macOS + Apple Silicon).
 - **Graph compatibility**: Legacy inputs are migrated internally so your old graphs still work.
 - **Unified Loading**: Seamlessly handles local paths, HuggingFace repo IDs, and predefined aliases (e.g., `dev`, `schnell`).

@@ -10,8 +10,6 @@ Here is the updated Korean `README.md` file, translated from the current English
 
 ## 개요 (Overview)
 
-이 포크는 ComfyUI 워크플로우 호환성을 유지하면서 기존 노드를 **mflux 0.13.1**을 사용하도록 업그레이드했습니다. mflux 0.13.x의 새로운 통합 아키텍처를 활용하여 표준 FLUX 생성뿐만 아니라 Fill, Depth, Redux, Z-Image Turbo와 같은 특수 변형도 지원합니다.
-
 - **백엔드**: mflux 0.13.1 (macOS + Apple Silicon 필요).
 - **그래프 호환성**: 기존 입력이 내부적으로 마이그레이션되므로 이전 그래프가 여전히 작동합니다.
 - **통합 로딩**: 로컬 경로, HuggingFace 리포지토리 ID, 사전 정의된 별칭(예: `dev`, `schnell`)을 원활하게 처리합니다.

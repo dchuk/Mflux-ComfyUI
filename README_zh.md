@@ -10,8 +10,6 @@ Here is the updated `README_zh.md` file, translated to match the content of the 
 
 ## 概览
 
-本分支将原有的节点升级以支持 **mflux 0.13.1**，同时保持了 ComfyUI 工作流的兼容性。它利用 mflux 0.13.x 的全新统一架构，不仅支持标准的 FLUX 生成，还支持 Fill（填充）、Depth（深度）、Redux（重组）和 Z-Image Turbo 等特殊变体。
-
 - **后端**: mflux 0.13.1 (需要 macOS + Apple Silicon)。
 - **图表兼容性**: 内部迁移了旧版输入，因此您的旧图表仍然可以工作。
 - **统一加载**: 无缝处理本地路径、HuggingFace 仓库 ID 和预定义别名（例如 `dev`, `schnell`）。

@@ -9,9 +9,10 @@ dependencies = [
 ]
 
 [project.urls]
-Repository = "https://github.com/rurounigit/Mflux-ComfyUI"
+Repository = "https://github.com/joonsoome/Mflux-ComfyUI"
+#  Used by Comfy Registry https://comfyregistry.org
 
 [tool.comfy]
-PublisherId = "rurounigit"
+PublisherId = "joonsoome"
 DisplayName = "Mflux-ComfyUI"
 Icon = "assets/icon.svg"

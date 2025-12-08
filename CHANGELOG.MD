@@ -34,6 +34,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 *   **Backend Architecture (Polymorphic Loading):**
     *   **Previous behavior:** The backend supported only the FLUX architecture via the `Flux1` class.
     *   **New behavior:** Implements a factory pattern (`load_or_create_model`) to dynamically instantiate distinct classes (`Flux1`, `FIBO`, `QwenImage`, `ZImageTurbo`, `Flux1Fill`, `Flux1Depth`, `Flux1Redux`) based on the `base_model` hint and model type.
+*   **Mflux Models Loader:**
+    *   **Smart Scanning:** Now recursively scans subdirectories in `models/Mflux` to find model roots.
+    *   **Visual Indicators:** Added symbols to the dropdown to indicate source: 🟢 (Cached), 📁 (Local), ☁️ (Alias).
+    *   **Labels:** Renamed input to `model` and output to `model_to_load`.
+*   **Mflux Models Downloader:**
+    *   **Labels:** Renamed input to `model` and output to `downloaded_model`.
 *   **Dependencies:**
     *   Updated `mflux` from `0.10.0` to `0.13.1`.
     *   Updated `huggingface_hub` from `>=0.24` to `>=0.26.0`.
@@ -60,3 +66,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 *   **Legacy Inputs:** Removed `Local_model` input from `QuickMfluxNode` (functionality merged into the unified `model` string input).
 *   **Inline Optimizations:** Removed `low_ram` and `vae_tiling` toggles directly from `QuickMfluxNode` (moved to the `MFlux Optimizations` node).
+
+### Fixed
+
+*   **Crash on Empty Prompt:** Added a safety check to `QuickMfluxNode` and `MfluxZImageNode`. If the prompt is empty, it falls back to `.` to prevent the backend error `[reshape] Cannot infer the shape of an empty array`.

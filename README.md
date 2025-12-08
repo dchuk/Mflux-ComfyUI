@@ -16,13 +16,15 @@ This fork upgrades the original nodes to use **mflux 0.13.1** while keeping Comf
 ## What's New in mflux 0.13.1
 This version brings significant backend enhancements:
 - **Z-Image Turbo Support**: Support for the fast, distilled Z-Image variant optimized for speed (6B parameters).
-- **FIBO VLM Quantization**: Support for quantized (3/4/5/6/8-bit) FIBO VLM commands (`inspire`/`refine`).
+- **FIBO & Qwen Support**: Backend support for FIBO and Qwen-Image architectures.
+- **Smart Model Loader**: Visual indicators for cached vs. local models and recursive folder scanning.
 - **Unified Architecture**: Improved resolution for models, LoRAs, and tokenizers.
 
 ## Key features
 
 - **Core Generation**: Quick text2img and img2img in one node (`QuickMfluxNode`).
 - **Z-Image Turbo**: Dedicated node for the new high-speed model (`MFlux Z-Image Turbo`).
+- **Hardware Optimizations**: Dedicated node for **Low RAM** mode and **VAE Tiling** to prevent crashes on lower-memory Macs.
 - **FLUX Tools Support**: Dedicated nodes for **Fill** (Inpainting), **Depth** (Structure guidance), and **Redux** (Image variation).
 - **ControlNet**: Canny preview and best‑effort conditioning; includes support for the **Upscaler** ControlNet.
 - **LoRA Support**: Unified LoRA pipeline (quantize must be 8 when applying LoRAs).
@@ -41,7 +43,7 @@ This version brings significant backend enhancements:
    ```
 2. Clone the repository:
    ```bash
-   git clone https://github.com/rurounigit/Mflux-ComfyUI.git
+   git clone https://github.com/joonsoome/Mflux-ComfyUI.git
    ```
 3. Activate your ComfyUI virtual environment and install dependencies:
    ```bash
@@ -61,8 +63,12 @@ This version brings significant backend enhancements:
 ### MFlux/Air (Standard)
 - **QuickMfluxNode**: The all-in-one node for standard FLUX txt2img, img2img, LoRA, and ControlNet.
 - **MFlux Z-Image Turbo**: Dedicated node for Z-Image generation (optimized defaults: 9 steps, no guidance).
-- **Mflux Models Loader**: Select local models from `models/Mflux`.
-- **Mflux Models Downloader**: Download quantized or full models directly from HuggingFace.
+- **Mflux Optimizations**: Configure **Low RAM** (MemorySaver) and **VAE Tiling** settings here and connect to the main node.
+- **Mflux Models Loader**: Smart selector for models. Recursively scans `models/Mflux` and checks your system cache.
+  - 🟢 = Cached (Ready to use)
+  - 📁 = Local (In your ComfyUI folder)
+  - ☁️ = Alias (May trigger download)
+- **Mflux Models Downloader**: Download quantized or full models directly from HuggingFace to your local folder.
 - **Mflux Custom Models**: Compose and save custom quantized variants.
 
 ### MFlux/Pro (Advanced)
@@ -75,6 +81,7 @@ This version brings significant backend enhancements:
 ## Usage Tips
 
 - **Z-Image Turbo**: Use the dedicated node. It defaults to **9 steps** and **0 guidance** (required for this model).
+- **Optimizations**: If you run out of memory, use the **Mflux Optimizations** node. Enable `low_ram` for generation and `vae_tiling` for decoding large images.
 - **LoRA Compatibility**: LoRAs currently require the base model to be loaded with `quantize=8` (or None).
 - **Dimensions**: Width and Height should be multiples of 16 (automatically adjusted if needed).
 - **Guidance**:
@@ -92,8 +99,10 @@ Check the `workflows` folder for JSON examples:
 - `Mflux img2img.json`
 - `Mflux ControlNet.json`
 - `Mflux Fill/Redux/Depth` examples (if available)
-- `Mflux Z-Image Turbo.json`
-- `Mflux Z-Image Turbo img2img lora.json`
+The workflows for  Z-Image Turbo  are embedded in the png files in the `examples` folder:
+- `Air_Z-Image-Turbo.png`
+- `Air_Z-Image-Turbo_model_loader.png`
+- `Air_Z-Image-Turbo_img2img_lora.png`
 
 If nodes appear red in ComfyUI, use the Manager's "Install Missing Custom Nodes" feature.
 

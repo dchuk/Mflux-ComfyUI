@@ -1,3 +1,6 @@
+Here is the updated `README_zh.md` file, translated to match the content of the current English `README.md`.
+
+```markdown
 <h1 align="center">Mflux-ComfyUI 2.1.0</h1>
 
 <p align="center">
@@ -16,13 +19,15 @@
 ## mflux 0.13.1 新特性
 该版本带来了重大的后端增强：
 - **Z-Image Turbo 支持**: 支持专为速度优化的快速蒸馏 Z-Image 变体（6B 参数）。
-- **FIBO VLM 量化**: 支持量化（3/4/5/6/8-bit）的 FIBO VLM 命令 (`inspire`/`refine`)。
+- **FIBO & Qwen 支持**: 针对 FIBO 和 Qwen-Image 架构的后端支持。
+- **智能模型加载器**: 提供缓存模型与本地模型的视觉指示器，并支持递归文件夹扫描。
 - **统一架构**: 改进了模型、LoRA 和 Tokenizer 的解析能力。
 
 ## 主要功能
 
 - **核心生成**: 一个节点即可完成快速文生图 (text2img) 和 图生图 (img2img) (`QuickMfluxNode`)。
 - **Z-Image Turbo**: 专为新的高速模型设计的独立节点 (`MFlux Z-Image Turbo`)。
+- **硬件优化**: 专用节点用于 **Low RAM** (低内存) 模式和 **VAE Tiling** (分块解码)，防止在低内存 Mac 上崩溃。
 - **FLUX 工具支持**: 专用于 **Fill** (内补绘制/Inpainting)、**Depth** (结构引导) 和 **Redux** (图像变体) 的节点。
 - **ControlNet**: Canny 预览和尽力而为（best‑effort）的调节；包含对 **Upscaler** (放大) ControlNet 的支持。
 - **LoRA 支持**: 统一的 LoRA 流程（应用 LoRA 时量化必须设为 8 或 None）。
@@ -41,7 +46,7 @@
    ```
 2. 克隆仓库：
    ```bash
-   git clone https://github.com/rurounigit/Mflux-ComfyUI.git
+   git clone https://github.com/joonsoome/Mflux-ComfyUI.git
    ```
 3. 激活您的 ComfyUI 虚拟环境并安装依赖：
    ```bash
@@ -61,8 +66,12 @@
 ### MFlux/Air (标准)
 - **QuickMfluxNode**: 用于标准 FLUX 文生图、图生图、LoRA 和 ControlNet 的全能节点。
 - **MFlux Z-Image Turbo**: Z-Image 生成专用节点（优化默认值：9 步，无引导）。
-- **Mflux Models Loader**: 从 `models/Mflux` 选择本地模型。
-- **Mflux Models Downloader**: 直接从 HuggingFace 下载量化版或完整版模型。
+- **Mflux Optimizations**: 在此处配置 **Low RAM** (内存节能) 和 **VAE Tiling** 设置，并连接到主节点。
+- **Mflux Models Loader**: 智能模型选择器。递归扫描 `models/Mflux` 并检查系统缓存。
+  - 🟢 = 已缓存 (可直接使用)
+  - 📁 = 本地 (位于 ComfyUI 文件夹中)
+  - ☁️ = 别名 (可能会触发下载)
+- **Mflux Models Downloader**: 直接从 HuggingFace 下载量化版或完整版模型到本地文件夹。
 - **Mflux Custom Models**: 组合并保存自定义量化变体。
 
 ### MFlux/Pro (高级)
@@ -75,6 +84,7 @@
 ## 使用提示
 
 - **Z-Image Turbo**: 请使用专用节点。它默认设置为 **9 steps** 和 **0 guidance**（该模型必须使用 0 guidance）。
+- **优化**: 如果遇到内存不足，请使用 **Mflux Optimizations** 节点。启用 `low_ram` 用于生成，启用 `vae_tiling` 用于解码大图像。
 - **LoRA 兼容性**: 目前使用 LoRA 时，要求基础模型加载时 `quantize=8`（或者设为 None）。
 - **尺寸**: 宽度和高度应为 16 的倍数（如有需要会自动调整）。
 - **Guidance (引导系数)**:
@@ -92,8 +102,11 @@
 - `Mflux img2img.json`
 - `Mflux ControlNet.json`
 - `Mflux Fill/Redux/Depth` 示例 (如果有)
-- `Mflux Z-Image Turbo.json`
-- `Mflux Z-Image Turbo img2img lora.json`
+
+Z-Image Turbo 的工作流嵌入在 `examples` 文件夹的 png 文件中：
+- `Air_Z-Image-Turbo.png`
+- `Air_Z-Image-Turbo_model_loader.png`
+- `Air_Z-Image-Turbo_img2img_lora.png`
 
 如果 ComfyUI 中节点显示为红色，请使用 Manager 的 “Install Missing Custom Nodes” 功能。
 
@@ -107,3 +120,4 @@
 ## 许可证
 
 MIT
+```

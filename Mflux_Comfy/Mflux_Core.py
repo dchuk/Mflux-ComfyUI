@@ -41,7 +41,11 @@ try:
     except ImportError:
         ControlnetUtil = None
 
-except ImportError:
+except ImportError as e:
+    # Print the error so the user knows WHY it failed (e.g. version mismatch)
+    print(f"!! [MFlux-ComfyUI] Import Error: {e}")
+    print("!! [MFlux-ComfyUI] Please ensure you have 'mflux==0.13.1' installed.")
+
     # Define dummy classes so isinstance() checks don't fail in tests/CI
     class _DummyModel: pass
 
@@ -59,7 +63,6 @@ except ImportError:
     ControlnetUtil = None
     MemorySaver = None
 
-    # Stub for tests where mflux is not installed
     class _StubConfig(dict):
         def __init__(self, **kwargs):
             super().__init__(**kwargs)
@@ -108,20 +111,14 @@ def is_third_party_model(model_string: str) -> bool:
     return any(str(model_string).startswith(p) for p in prefixes)
 
 def infer_quant_bits(name: str | None) -> int | None:
-    """
-    Infer quantization bits by checking config.json first, then falling back to filename.
-    """
     if not name:
         return None
-
-    # 1. Try to check config.json if 'name' is a directory
     if os.path.isdir(str(name)):
         config_path = os.path.join(name, "config.json")
         if os.path.exists(config_path):
             try:
                 with open(config_path, 'r') as f:
                     cfg = json.load(f)
-                    # Check for common mflux/hf quantization keys
                     if "quantization_level" in cfg:
                         return int(cfg["quantization_level"])
                     if "quantization_config" in cfg:
@@ -129,9 +126,7 @@ def infer_quant_bits(name: str | None) -> int | None:
                         if isinstance(q_cfg, dict) and "bits" in q_cfg:
                             return int(q_cfg["bits"])
             except Exception:
-                pass # Fallback to filename
-
-    # 2. Fallback to filename string matching
+                pass
     s = str(name).lower()
     for b in (8, 6, 5, 4, 3):
         if f"{b}-bit" in s or f"{b}bit" in s:
@@ -141,14 +136,15 @@ def infer_quant_bits(name: str | None) -> int | None:
     return None
 
 def load_or_create_model(model_string, quantize, model_path, lora_paths, lora_scales, variant="txt2img", controlnet_path=None, base_model_hint="dev"):
-    if not (Flux1 or FIBO or QwenImage or ZImageTurbo):
-        raise ImportError("MFlux is not installed or failed to load.")
+    # CRITICAL CHECK: If ModelConfig is None, imports failed. Stop here.
+    if ModelConfig is None:
+        raise ImportError(
+            "MFlux dependencies are not loaded correctly. "
+            "Please check your console logs for import errors. "
+            "Ensure you have installed 'mflux==0.13.1' in your ComfyUI environment."
+        )
 
     effective_model_path = model_path if model_path else None
-
-    # If quantize is None (Auto), we do NOT force it. We let mflux load what's there.
-    # We only infer it if we need to pass a value, but mflux handles None gracefully by loading native weights.
-
     key = (model_string, quantize, effective_model_path, tuple(lora_paths), tuple(lora_scales), variant, controlnet_path, base_model_hint)
     if key not in model_cache:
         model_cache.clear()

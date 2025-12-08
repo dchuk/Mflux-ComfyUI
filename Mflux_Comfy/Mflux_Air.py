@@ -60,16 +60,17 @@ def is_model_directory(path):
     except Exception:
         return False
 
-# Helper to get a set of cached repo IDs
-def get_cached_repos():
+# Helper to get list of cached model repo IDs
+def get_cached_models():
     if scan_cache_dir is None:
-        return set()
+        return []
     try:
         cache_info = scan_cache_dir()
-        # Return a set of repo_ids (e.g., "black-forest-labs/FLUX.1-schnell")
-        return {repo.repo_id for repo in cache_info.repos}
+        # Filter for models only, return sorted list of repo_ids
+        models = [repo.repo_id for repo in cache_info.repos if repo.repo_type == "model"]
+        return sorted(models, key=str.lower)
     except Exception:
-        return set()
+        return []
 
 class MfluxOptimizations:
     @classmethod
@@ -210,33 +211,21 @@ class MfluxModelsLoader:
                     dirs[:] = [] # Stop recursing
         local_models.sort(key=str.lower)
 
-        # 2. Check System Cache for Aliases
-        cached_repos = get_cached_repos()
+        # 2. Check System Cache for ALL models
+        # This lists the actual Repo IDs found in the cache
+        cached_models = [f"🟢 {repo}" for repo in get_cached_models()]
 
-        # Map aliases to their underlying HF Repo IDs to check existence
-        # Note: These mappings are based on mflux defaults
-        alias_map = {
-            "dev": "black-forest-labs/FLUX.1-dev",
-            "schnell": "black-forest-labs/FLUX.1-schnell",
-            "qwen": "filipstrand/Qwen-Image-mflux-6bit", # Common default
-            "fibo": "briaai/Fibo-mlx-8bit", # Common default
-            "z-image-turbo": "filipstrand/Z-Image-Turbo-mflux-4bit"
-        }
+        # 3. Aliases (Shortcuts)
+        # These are abstract names that mflux resolves internally.
+        # We mark them with a Cloud to indicate they are shortcuts/downloads.
+        aliases = ["dev", "schnell", "qwen", "fibo", "z-image-turbo"]
+        alias_options = [f"☁️ {alias}" for alias in aliases]
 
-        alias_options = []
-        for alias in ["dev", "schnell", "qwen", "fibo", "z-image-turbo"]:
-            repo_id = alias_map.get(alias, "")
-            # Check if the repo ID exists in cache
-            if repo_id in cached_repos:
-                alias_options.append(f"🟢 {alias}")
-            else:
-                alias_options.append(f"☁️ {alias}")
-
-        final_options = alias_options + local_models
+        final_options = local_models + cached_models + alias_options
 
         return {
             "required": {
-                "model": (final_options or ["None"], {"default": final_options[0] if final_options else "None", "tooltip": "🟢 = Cached (Ready)\n📁 = Local (ComfyUI/models/Mflux)\n☁️ = Not Cached (Will Download)"}),
+                "model": (final_options or ["None"], {"default": final_options[0] if final_options else "None", "tooltip": "📁 = Local (ComfyUI/models/Mflux)\n🟢 = Cached (HuggingFace System Cache)\n☁️ = Alias/Shortcut (May trigger download)"}),
             },
             "optional": {
                 "free_path": ("STRING", {"default": "", "tooltip": "Manually input an absolute model path to override the selection above."}),
@@ -267,7 +256,7 @@ class MfluxModelsLoader:
                     print(f"Warning: Local model path {full_path} not found. Passing name '{clean_name}' as string.")
                     return (clean_name,)
 
-            # If it was an alias (🟢 or ☁️), return the alias string
+            # If it was a cached repo (🟢) or alias (☁️), return the string as-is
             return (clean_name,)
 
         return ("",)

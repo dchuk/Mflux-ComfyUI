@@ -24,6 +24,7 @@ try:
     if _skip_mflux_import:
         raise ImportError("Skipping Mflux import via env var")
     from mflux.models.common.config import ModelConfig
+    from mflux.config.config import Config
     from mflux.callbacks.callback_registry import CallbackRegistry
     from mflux.models.flux.variants.txt2img.flux import Flux1
     from mflux.models.flux.variants.controlnet.flux_controlnet import Flux1Controlnet
@@ -53,6 +54,11 @@ except ImportError:
     CallbackRegistry = None
     ControlnetUtil = None
     MemorySaver = None
+
+    class _StubConfig(dict):
+        def __init__(self, **kwargs):
+            super().__init__(**kwargs)
+    Config = _StubConfig
 
 from .Mflux_Pro import MfluxControlNetPipeline
 
@@ -395,6 +401,7 @@ def save_images_with_metadata(images, prompt, model_alias, quantize, model_path,
             "negative_prompt_used": negative_prompt_used,
             "vae_tiling": vae_tiling,
             "vae_tiling_split": vae_tiling_split,
+            "low_ram": low_ram,
         }
         with open(metadata_jsonfile, 'w') as metadata_file:
             json.dump(json_dict, metadata_file, indent=4)

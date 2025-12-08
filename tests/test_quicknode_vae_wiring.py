@@ -9,7 +9,7 @@ def test_quicknode_forwards_vae_flags(monkeypatch, tmp_path):
     # Prepare a dummy generate_image stub that asserts it receives vae flags
     captured = {}
 
-    def fake_generate_image(prompt, model, seed, width, height, steps, guidance, quantize, metadata, model_path, img2img, Loras, ControlNet, base_model=None, negative_prompt="", low_ram=False, vae_tiling=False, vae_tiling_split="horizontal"):
+    def fake_generate_image(prompt, model_string, seed, width, height, steps, guidance, quantize, metadata, model_path, img2img_pipeline, loras_pipeline, controlnet_pipeline, base_model_hint="dev", negative_prompt="", low_ram=False, vae_tiling=False, vae_tiling_split="horizontal"):
         captured['generate_kwargs'] = {
             'vae_tiling': vae_tiling,
             'vae_tiling_split': vae_tiling_split,

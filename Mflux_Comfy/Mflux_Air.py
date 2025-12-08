@@ -381,7 +381,8 @@ class QuickMfluxNode:
                 base_model_hint=base_model,
                 negative_prompt_used=negative_prompt,
                 vae_tiling=vae_tiling,
-                vae_tiling_split=vae_tiling_split
+                vae_tiling_split=vae_tiling_split,
+                low_ram=low_ram # Added this
             )
 
         return generated_images
@@ -490,6 +491,7 @@ class MfluxZImageNode:
                 base_model_hint="z-image-turbo",
                 negative_prompt_used="",
                 vae_tiling=vae_tiling,
-                vae_tiling_split=vae_tiling_split
+                vae_tiling_split=vae_tiling_split,
+                low_ram=low_ram # Added this
             )
         return generated_images

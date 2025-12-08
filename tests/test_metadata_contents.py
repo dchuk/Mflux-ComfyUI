@@ -18,29 +18,30 @@ def test_metadata_contains_mflux_and_lora_info(monkeypatch, tmp_path):
     t = _torch.from_numpy(arr).unsqueeze(0).to(_torch.float32) / 255.0
 
     # Call the real saver with some lora info and extra parameters to validate in JSON
+    # Using keyword arguments for robustness
     core.save_images_with_metadata(
-        (t,),
-        "hello",
-        "dev",
-        "8",
-        "",
-        42,
-        t.shape[1],
-        t.shape[2],
-        5,
-        2.0,
-        ["loraA"],
-        [0.5],
-        str(src),
-        1.0,
-        extra_pnginfo={},
-        base_model="dev",
-        low_ram=True,
+        images=(t,),
+        prompt="hello",
+        model_alias="dev",
+        quantize="8",
+        quantize_effective="8",
+        model_path="",
+        seed=42,
+        height=t.shape[1],
+        width=t.shape[2],
+        steps=5,
+        guidance=2.0,
+        image_path=str(src),
+        image_strength=1.0,
+        lora_paths=["loraA"],
+        lora_scales=[0.5],
         control_image_path="ctrl.png",
         control_strength=0.6,
         control_model="cnet",
-        quantize_effective="8",
-        negative_prompt_used="bad quality", # New arg
+        extra_pnginfo={},
+        base_model_hint="dev",
+        low_ram=True,
+        negative_prompt_used="bad quality",
     )
 
     mflux_dir = tmp_path / "MFlux"
@@ -55,14 +56,14 @@ def test_metadata_contains_mflux_and_lora_info(monkeypatch, tmp_path):
     assert data.get("lora_scales") == [0.5]
     # Basic fields
     assert data.get("prompt") == "hello"
-    assert data.get("model_alias") == "dev" # Renamed from model
+    assert data.get("model_alias") == "dev"
     assert data.get("quantize") == "8"
     assert data.get("quantize_effective") == "8"
     assert data.get("seed") == 42
     assert data.get("image_path") == str(src)
     assert data.get("image_strength") == 1.0
     # Flags passed through
-    assert data.get("base_model_hint") == "dev" # Renamed from base_model
+    assert data.get("base_model_hint") == "dev"
     assert data.get("low_ram") is True
     # Guidance only present for dev model
     assert data.get("guidance") == 2.0

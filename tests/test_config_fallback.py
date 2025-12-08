@@ -39,9 +39,9 @@ def test_generate_config_fallback(monkeypatch, tmp_path):
     # Call generate_image with vae_tiling=True.
     # This should trigger the TypeError in DummyConfig, causing the backend to retry without it.
     result = core.generate_image(
-        prompt="p", model="dev", seed=-1, width=16, height=16, steps=1,
-        guidance=1.0, quantize="8", metadata=True, Local_model="",
-        image=None, vae_tiling=True
+        prompt="p", model_string="dev", seed=-1, width=16, height=16, steps=1,
+        guidance=1.0, quantize="8", metadata=True, model_path="",
+        img2img_pipeline=None, loras_pipeline=None, controlnet_pipeline=None, vae_tiling=True
     )
 
     # Should return a tuple with a tensor-like first element

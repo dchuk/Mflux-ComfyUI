@@ -32,45 +32,32 @@ def test_metadata_includes_vae_tiling(tmp_path, monkeypatch):
     monkeypatch.setattr(folder_paths, "get_save_image_path", mock_get_save_image_path)
 
     images = make_dummy_image_tensor()
-    prompt = "test"
-    model = "dev"
-    quantize = "8"
-    Local_model = ""
-    seed = 42
-    height = 16
-    width = 16
-    steps = 10
-    guidance = 3.5
-    lora_paths = []
-    lora_scales = []
-    image_path = None
-    image_strength = None
 
-    # Call the save helper with vae_tiling flags set
+    # Call the save helper with vae_tiling flags set using keyword args
     res = save_images_with_metadata(
         images=images,
-        prompt=prompt,
-        model_alias=model, # Renamed
-        quantize=quantize,
-        model_path=Local_model, # Renamed
-        seed=seed,
-        height=height,
-        width=width,
-        steps=steps,
-        guidance=guidance,
-        lora_paths=lora_paths,
-        lora_scales=lora_scales,
-        image_path=image_path,
-        image_strength=image_strength,
+        prompt="test",
+        model_alias="dev",
+        quantize="8",
+        quantize_effective="8-bit",
+        model_path="",
+        seed=42,
+        height=16,
+        width=16,
+        steps=10,
+        guidance=3.5,
+        lora_paths=[],
+        lora_scales=[],
+        image_path=None,
+        image_strength=None,
         filename_prefix="TEST_MFLUX",
         full_prompt=None,
         extra_pnginfo=None,
-        base_model_hint="dev", # Renamed
+        base_model_hint="dev",
         low_ram=False,
         control_image_path=None,
         control_strength=None,
         control_model=None,
-        quantize_effective="8-bit",
         vae_tiling=True,
         vae_tiling_split="vertical",
     )

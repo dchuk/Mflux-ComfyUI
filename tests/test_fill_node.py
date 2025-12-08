@@ -39,6 +39,7 @@ def test_fill_forwards_mask_and_calls_metadata(monkeypatch, tmp_path):
     monkeypatch.setattr(core, "save_images_with_metadata", _spy_save)
 
     # Call the (spied) save and assert the captured metadata
+    # Note: Updated args to match new signature in Mflux_Core.py
     core.save_images_with_metadata(out, "p", "dev", "8", "", -1, out[0].shape[1], out[0].shape[2], 10, 3.5, [], [], str(src), 1.0, extra_pnginfo={"masked_image_path": str(mask)})
     assert 'kwargs' in called
     assert called['kwargs'].get('extra_pnginfo', {}).get('masked_image_path') == str(mask)

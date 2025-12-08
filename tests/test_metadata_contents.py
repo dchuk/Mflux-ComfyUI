@@ -40,6 +40,7 @@ def test_metadata_contains_mflux_and_lora_info(monkeypatch, tmp_path):
         control_strength=0.6,
         control_model="cnet",
         quantize_effective="8",
+        negative_prompt_used="bad quality", # New arg
     )
 
     mflux_dir = tmp_path / "MFlux"
@@ -54,14 +55,14 @@ def test_metadata_contains_mflux_and_lora_info(monkeypatch, tmp_path):
     assert data.get("lora_scales") == [0.5]
     # Basic fields
     assert data.get("prompt") == "hello"
-    assert data.get("model") == "dev"
+    assert data.get("model_alias") == "dev" # Renamed from model
     assert data.get("quantize") == "8"
     assert data.get("quantize_effective") == "8"
     assert data.get("seed") == 42
     assert data.get("image_path") == str(src)
     assert data.get("image_strength") == 1.0
     # Flags passed through
-    assert data.get("base_model") == "dev"
+    assert data.get("base_model_hint") == "dev" # Renamed from base_model
     assert data.get("low_ram") is True
     # Guidance only present for dev model
     assert data.get("guidance") == 2.0
@@ -69,3 +70,5 @@ def test_metadata_contains_mflux_and_lora_info(monkeypatch, tmp_path):
     assert data.get("control_image_path") == "ctrl.png"
     assert data.get("control_strength") == 0.6
     assert data.get("control_model") == "cnet"
+    # New field
+    assert data.get("negative_prompt_used") == "bad quality"

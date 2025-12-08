@@ -21,10 +21,7 @@ def test_download_requires_huggingface(monkeypatch):
 
 def test_download_logic(monkeypatch, tmp_path):
     """
-    Verify the download logic:
-    1. Calls snapshot_download with correct args.
-    2. Skips download if directory exists.
-    3. Forces download if force_redownload is True.
+    Verify the download logic via the Node class to ensure input mapping is correct.
     """
     # Mock the snapshot_download function
     mock_download = MagicMock()
@@ -36,8 +33,12 @@ def test_download_logic(monkeypatch, tmp_path):
     model_name = "flux.1-schnell-mflux-4bit"
     expected_repo_id = "madroid/flux.1-schnell-mflux-4bit"
 
+    # Instantiate the Node
+    downloader = mflux_air.MfluxModelsDownloader()
+
     # --- Case 1: Directory does not exist (Should download) ---
-    mflux_air.download_hg_model(model_name)
+    # Note: The input name in the Node class is now 'model', not 'model_version'
+    downloader.download_model(model=model_name)
 
     mock_download.assert_called_once()
     call_kwargs = mock_download.call_args[1]
@@ -51,11 +52,11 @@ def test_download_logic(monkeypatch, tmp_path):
     model_dir = tmp_path / model_name
     model_dir.mkdir()
 
-    mflux_air.download_hg_model(model_name, force_redownload=False)
+    downloader.download_model(model=model_name, force_redownload=False)
 
     mock_download.assert_not_called()
 
     # --- Case 3: Directory exists + Force Redownload (Should download) ---
-    mflux_air.download_hg_model(model_name, force_redownload=True)
+    downloader.download_model(model=model_name, force_redownload=True)
 
     mock_download.assert_called_once()

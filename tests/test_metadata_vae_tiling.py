@@ -50,9 +50,9 @@ def test_metadata_includes_vae_tiling(tmp_path, monkeypatch):
     res = save_images_with_metadata(
         images=images,
         prompt=prompt,
-        model=model,
+        model_alias=model, # Renamed
         quantize=quantize,
-        Local_model=Local_model,
+        model_path=Local_model, # Renamed
         seed=seed,
         height=height,
         width=width,
@@ -65,7 +65,7 @@ def test_metadata_includes_vae_tiling(tmp_path, monkeypatch):
         filename_prefix="TEST_MFLUX",
         full_prompt=None,
         extra_pnginfo=None,
-        base_model="dev",
+        base_model_hint="dev", # Renamed
         low_ram=False,
         control_image_path=None,
         control_strength=None,

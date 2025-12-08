@@ -15,17 +15,18 @@ def test_generate_config_fallback(monkeypatch, tmp_path):
 
     import Mflux_Comfy.Mflux_Core as core
 
-    # Mock flux generation to raise TypeError on first call (simulating unknown kwarg), then succeed
+    # Mock Config to raise TypeError on first call (simulating unknown kwarg)
+    # We use 'vae_tiling' as the trigger, as it is passed to Config in the new Core logic
+    class DummyConfig:
+        def __init__(self, **kwargs):
+            if "vae_tiling" in kwargs:
+                raise TypeError("unexpected keyword argument 'vae_tiling'")
+
+    monkeypatch.setattr(core, "Config", DummyConfig)
+
+    # Mock flux generation
     class DummyFlux:
-        def __init__(self):
-            self.calls = 0
-
-        def generate_image(self, **kwargs):
-            self.calls += 1
-            # Simulate backend rejecting 'low_ram'
-            if "low_ram" in kwargs:
-                raise TypeError("unexpected keyword argument 'low_ram'")
-
+        def generate_image(self, seed, prompt, config):
             # Return dummy image
             import numpy as np
             import torch
@@ -35,12 +36,12 @@ def test_generate_config_fallback(monkeypatch, tmp_path):
 
     monkeypatch.setattr(core, "load_or_create_flux", lambda *a, **k: DummyFlux())
 
-    # Call generate_image with an extra kwarg that will trigger the TypeError path
-    # We use low_ram=True which is passed to generate_image
+    # Call generate_image with vae_tiling=True.
+    # This should trigger the TypeError in DummyConfig, causing the backend to retry without it.
     result = core.generate_image(
         prompt="p", model="dev", seed=-1, width=16, height=16, steps=1,
         guidance=1.0, quantize="8", metadata=True, Local_model="",
-        image=None, low_ram=True
+        image=None, vae_tiling=True
     )
 
     # Should return a tuple with a tensor-like first element

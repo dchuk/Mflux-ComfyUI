@@ -9,10 +9,11 @@ def test_quicknode_forwards_vae_flags(monkeypatch, tmp_path):
     # Prepare a dummy generate_image stub that asserts it receives vae flags
     captured = {}
 
-    def fake_generate_image(prompt, model, seed, width, height, steps, guidance, quantize, metadata, Local_model, img2img, Loras, ControlNet, base_model=None, low_ram=False, vae_tiling=False, vae_tiling_split="horizontal"):
+    def fake_generate_image(prompt, model, seed, width, height, steps, guidance, quantize, metadata, model_path, img2img, Loras, ControlNet, base_model=None, negative_prompt="", low_ram=False, vae_tiling=False, vae_tiling_split="horizontal"):
         captured['generate_kwargs'] = {
             'vae_tiling': vae_tiling,
             'vae_tiling_split': vae_tiling_split,
+            'low_ram': low_ram
         }
         # Return a trivial image tensor tuple expected by Quick node
         import numpy as np
@@ -30,7 +31,14 @@ def test_quicknode_forwards_vae_flags(monkeypatch, tmp_path):
     monkeypatch.setattr('Mflux_Comfy.Mflux_Air.generate_image', fake_generate_image)
     monkeypatch.setattr('Mflux_Comfy.Mflux_Air.save_images_with_metadata', fake_save_images_with_metadata)
 
-    # Call QuickMfluxNode.generate with vae flags enabled
+    # Create the optimizations packet (MFLUX_OPTS)
+    opts = {
+        "low_ram": False,
+        "vae_tiling": True,
+        "vae_tiling_split": "vertical"
+    }
+
+    # Call QuickMfluxNode.generate with the new signature
     node = QuickMfluxNode()
     img_tuple = node.generate(
         prompt="a test",
@@ -42,12 +50,14 @@ def test_quicknode_forwards_vae_flags(monkeypatch, tmp_path):
         guidance=3.5,
         quantize="8",
         metadata=True,
-        Local_model="",
+        model_input=None,
+        Local_model=None,
         img2img=None,
         Loras=None,
         ControlNet=None,
         base_model="dev",
-        low_ram=False,
+        negative_prompt="",
+        optimizations=opts, # Pass the dictionary here
         full_prompt=None,
         extra_pnginfo=None,
         size_preset="Custom",
@@ -55,11 +65,9 @@ def test_quicknode_forwards_vae_flags(monkeypatch, tmp_path):
         quality_preset="Custom",
         apply_quality_preset=True,
         randomize_seed=False,
-        vae_tiling=True,
-        vae_tiling_split="vertical",
     )
 
-    # Assert generate_image received the flags
+    # Assert generate_image received the flags unpacked from the opts dict
     assert captured.get('generate_kwargs', {}).get('vae_tiling') is True
     assert captured.get('generate_kwargs', {}).get('vae_tiling_split') == 'vertical'
 

@@ -24,7 +24,7 @@ try:
     if _skip_mflux_import:
         raise ImportError("Skipping Mflux import via env var")
     from mflux.models.common.config import ModelConfig
-    from mflux.config.config import Config
+    # Removed 'from mflux.config.config import Config' as it causes ImportError in 0.13.1
     from mflux.callbacks.callback_registry import CallbackRegistry
     from mflux.models.flux.variants.txt2img.flux import Flux1
     from mflux.models.flux.variants.controlnet.flux_controlnet import Flux1Controlnet
@@ -63,10 +63,10 @@ except ImportError as e:
     ControlnetUtil = None
     MemorySaver = None
 
-    class _StubConfig(dict):
-        def __init__(self, **kwargs):
-            super().__init__(**kwargs)
-    Config = _StubConfig
+# Define Config stub outside the try/except block so it's always available for tests if needed
+class Config(dict):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
 
 from .Mflux_Pro import MfluxControlNetPipeline
 

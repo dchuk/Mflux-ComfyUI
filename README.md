@@ -79,7 +79,15 @@ This version brings significant backend enhancements:
 ## Usage Tips
 
 - **Z-Image Turbo**: Use the dedicated node. It defaults to **9 steps** and **0 guidance** (required for this model).
-- **Optimizations**: If you run out of memory, use the **Mflux Optimizations** node. Enable `low_ram` for generation and `vae_tiling` for decoding large images.
+- **Optimizations**: These settings (in the **Mflux Optimizations** node) trade speed for stability. If your generation works fine without them, keep them OFF for best performance.
+
+  | Scenario | `low_ram` | `vae_tiling` | Why? |
+  | :--- | :--- | :--- | :--- |
+  | **Standard Use** (1024x1024, 4-bit model) | **OFF** | **OFF** | Fastest speed. Your Mac can handle it. |
+  | **High Quality** (1024x1024, **8-bit or 16-bit** model) | **ON** | **OFF** | 16-bit models are ~24GB. You need Low RAM to fit them on most Macs. |
+  | **High Res** (2048x2048 or Upscaling) | **OFF** | **ON** | Prevents the VAE from crashing at the end. |
+  | **Potato Mode** (8GB RAM Mac, multitasking) | **ON** | **ON** | Maximum stability to prevent system freezes, at the cost of speed. |
+
 - **LoRA Compatibility**: LoRAs currently require the base model to be loaded with `quantize=8` (or None).
 - **Dimensions**: Width and Height should be multiples of 16 (automatically adjusted if needed).
 - **Guidance**:

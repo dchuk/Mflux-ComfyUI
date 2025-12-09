@@ -64,8 +64,9 @@ def test_upscale_generate_forwarding(monkeypatch, tmp_path):
     assert captured.get("height") == exp_th
 
     # ControlNet should be an instance of the pipeline created by the node
-    assert isinstance(captured.get("ControlNet"), MfluxControlNetPipeline)
-    assert captured.get("ControlNet").model_selection == "jasperai/Flux.1-dev-Controlnet-Upscaler"
+    # Updated to check for 'controlnet_pipeline' instead of 'ControlNet'
+    assert isinstance(captured.get("controlnet_pipeline"), MfluxControlNetPipeline)
+    assert captured.get("controlnet_pipeline").model_selection == "jasperai/Flux.1-dev-Controlnet-Upscaler"
 
     # VAE tiling flags should be forwarded
     assert captured.get("vae_tiling") is True
@@ -86,7 +87,8 @@ def test_upscale_uses_oriented_control_image(monkeypatch, tmp_path):
     monkeypatch.setattr(core, "get_lora_info", lambda Loras: ([], []))
 
     def fake_generate_image(**kwargs):
-        cn = kwargs.get("ControlNet")
+        # Updated to retrieve 'controlnet_pipeline' instead of 'ControlNet'
+        cn = kwargs.get("controlnet_pipeline")
         # control_image_path should point to an oriented PNG file next to src
         cip = cn.control_image_path
         assert cip.endswith("_oriented.png") or cip == str(src)

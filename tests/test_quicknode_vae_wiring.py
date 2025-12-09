@@ -51,7 +51,7 @@ def test_quicknode_forwards_vae_flags(monkeypatch, tmp_path):
         guidance=3.5,
         quantize="8",
         metadata=True,
-        # model_input=None,  <-- REMOVED: This argument does not exist in your code
+        # model_input removed as it is no longer in the node signature
         Local_model=None,
         img2img=None,
         Loras=None,

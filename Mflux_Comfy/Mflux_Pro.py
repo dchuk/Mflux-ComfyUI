@@ -489,8 +489,6 @@ class MfluxUpscale:
                 "metadata": ("BOOLEAN", {"default": True, "label_on": "Save", "label_off": "Skip", "tooltip": "Save PNG + JSON metadata."}),
                 "vae_tiling": ("BOOLEAN", {"default": False, "label_on": "On", "label_off": "Off", "tooltip": "Enable VAE tiling to reduce peak memory for large upscales (may introduce seams)."}),
                 "vae_tiling_split": (["horizontal", "vertical"], {"default": "horizontal", "tooltip": "When vae_tiling is enabled, choose split orientation for tiling."}),
-                # Legacy upload widget (kept for backward compatibility). Ignored if input_image provided.
-                "upload": ("IMAGEUPLOAD", {"tooltip": "(Compatibility) Legacy upload widget; ignored if using `input_image`."}),
             }
         }
 
@@ -594,7 +592,7 @@ class MfluxUpscale:
 
         generated = generate_image(
             prompt=prompt,
-            model_string=model, # Renamed from model
+            model_string=model,
             seed=seed,
             width=tw,
             height=th,
@@ -602,11 +600,11 @@ class MfluxUpscale:
             guidance=3.5,
             quantize=quantize,
             metadata=metadata,
-            model_path="", # Renamed from Local_model
-            img2img_pipeline=imgstub, # Renamed from image
-            loras_pipeline=Loras, # Renamed from Loras
-            controlnet_pipeline=control_pipeline, # Renamed from ControlNet
-            base_model_hint=base_model, # Renamed from base_model
+            model_path="",
+            img2img_pipeline=imgstub,
+            loras_pipeline=Loras,
+            controlnet_pipeline=control_pipeline,
+            base_model_hint=base_model,
             low_ram=low_ram,
             vae_tiling=vae_tiling,
             vae_tiling_split=vae_tiling_split,
@@ -677,7 +675,7 @@ class MfluxFill:
             prompt=prompt,
             model_string=model,
             seed=seed,
-            width=iw, # Added width/height
+            width=iw,
             height=ih,
             steps=steps,
             guidance=3.5,
@@ -702,10 +700,9 @@ class MfluxFill:
             "masked_image_path": masked_oriented,
         }
         try:
-            # Updated to match new signature with None for ControlNet args
-            save_images_with_metadata(generated, prompt, model, quantize, quantize, "", seed, ih, iw, steps, 3.5, oriented_path, 1.0, lora_paths, lora_scales, None, None, None, filename_prefix="Mflux", full_prompt=None, extra_pnginfo=extra, base_model_hint=base_model, low_ram=low_ram)
-        except Exception as e:
-            print(f"[MFlux-ComfyUI] Metadata save failed in Fill: {e}")
+            save_images_with_metadata(generated, prompt, model, quantize, "", seed, ih, iw, steps, 3.5, image_path=oriented_path, image_strength=1.0, lora_paths=lora_paths, lora_scales=lora_scales, control_image_path=None, control_strength=None, control_model=None, filename_prefix="Mflux", full_prompt=None, extra_pnginfo=extra, base_model_hint=base_model, low_ram=low_ram)
+        except Exception:
+            # Non-fatal: metadata saving should not block generation
             pass
 
         return generated
@@ -802,8 +799,7 @@ class MfluxDepth:
             "depth_image_path": depth_path,
         }
         try:
-            # Updated to match new signature with None for ControlNet args
-            save_images_with_metadata(generated, prompt, model, quantize, quantize, "", seed, ih, iw, steps, 3.5, oriented_path, 1.0, lora_paths, lora_scales, None, None, None, filename_prefix="Mflux", full_prompt=None, extra_pnginfo=extra, base_model_hint=base_model, low_ram=low_ram)
+            save_images_with_metadata(generated, prompt, model, quantize, "", seed, ih, iw, steps, 3.5, image_path=oriented_path, image_strength=1.0, lora_paths=lora_paths, lora_scales=lora_scales, control_image_path=None, control_strength=None, control_model=None, filename_prefix="Mflux", full_prompt=None, extra_pnginfo=extra, base_model_hint=base_model, low_ram=low_ram)
         except Exception:
             pass
 
@@ -918,8 +914,7 @@ class MfluxRedux:
                     rw, rh = 0, 0
             else:
                 rw, rh = 0, 0
-            # Updated to match new signature with None for ControlNet args
-            save_images_with_metadata(generated, prompt, model, quantize, quantize, "", seed, rh or 0, rw or 0, steps, 3.5, imgstub.image_path, 1.0, lora_paths, lora_scales, None, None, None, filename_prefix="Mflux", full_prompt=None, extra_pnginfo=extra, base_model_hint=base_model, low_ram=low_ram)
+            save_images_with_metadata(generated, prompt, model, quantize, "", seed, rh or 0, rw or 0, steps, 3.5, image_path=imgstub.image_path, image_strength=1.0, lora_paths=lora_paths, lora_scales=lora_scales, control_image_path=None, control_strength=None, control_model=None, filename_prefix="Mflux", full_prompt=None, extra_pnginfo=extra, base_model_hint=base_model, low_ram=low_ram)
         except Exception:
             pass
 

@@ -8,6 +8,7 @@ from PIL.PngImagePlugin import PngInfo
 import folder_paths
 import comfy.utils
 from importlib import import_module
+import gc # Added for garbage collection
 
 # --- MFLUX Imports with Guards ---
 _skip_mlx_import = os.environ.get("MFLUX_COMFY_DISABLE_MLX_IMPORT") == "1"
@@ -316,6 +317,13 @@ def generate_image(prompt, model_string, seed, width, height, steps, guidance, q
     except Exception as e:
         print(f"[MFlux-ComfyUI] Error during generation: {e}")
         raise e
+    finally:
+        # If Low RAM was used, the model state might be modified (unloaded weights).
+        # We must clear the cache to ensure the next run reloads a fresh, complete model.
+        if low_ram:
+            print("[MFlux-ComfyUI] Low RAM mode: Clearing model cache to free resources and reset state.")
+            model_cache.clear()
+            gc.collect()
 
     if hasattr(generated_result, "image"):
         pil_image = generated_result.image

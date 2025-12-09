@@ -594,7 +594,7 @@ class MfluxUpscale:
 
         generated = generate_image(
             prompt=prompt,
-            model=model,
+            model_string=model, # Renamed from model
             seed=seed,
             width=tw,
             height=th,
@@ -602,11 +602,11 @@ class MfluxUpscale:
             guidance=3.5,
             quantize=quantize,
             metadata=metadata,
-            Local_model="",
-            image=imgstub,
-            Loras=Loras,
-            ControlNet=control_pipeline,
-            base_model=base_model,
+            model_path="", # Renamed from Local_model
+            img2img_pipeline=imgstub, # Renamed from image
+            loras_pipeline=Loras, # Renamed from Loras
+            controlnet_pipeline=control_pipeline, # Renamed from ControlNet
+            base_model_hint=base_model, # Renamed from base_model
             low_ram=low_ram,
             vae_tiling=vae_tiling,
             vae_tiling_split=vae_tiling_split,
@@ -675,17 +675,19 @@ class MfluxFill:
         # Forward mask path as 'masked_image_path' for core
         generated = generate_image(
             prompt=prompt,
-            model=model,
+            model_string=model,
             seed=seed,
+            width=iw, # Added width/height
+            height=ih,
             steps=steps,
             guidance=3.5,
             quantize=quantize,
             metadata=metadata,
-            Local_model="",
-            image=imgstub,
+            model_path="",
+            img2img_pipeline=imgstub,
             masked_image_path=masked_oriented,
-            Loras=Loras,
-            base_model=base_model,
+            loras_pipeline=Loras,
+            base_model_hint=base_model,
             low_ram=low_ram,
         )
 
@@ -700,9 +702,10 @@ class MfluxFill:
             "masked_image_path": masked_oriented,
         }
         try:
-            save_images_with_metadata(generated, prompt, model, quantize, "", seed, ih, iw, steps, 3.5, lora_paths, lora_scales, oriented_path, 1.0, filename_prefix="Mflux", full_prompt=None, extra_pnginfo=extra, base_model=base_model, low_ram=low_ram)
-        except Exception:
-            # Non-fatal: metadata saving should not block generation
+            # Updated to match new signature with None for ControlNet args
+            save_images_with_metadata(generated, prompt, model, quantize, quantize, "", seed, ih, iw, steps, 3.5, oriented_path, 1.0, lora_paths, lora_scales, None, None, None, filename_prefix="Mflux", full_prompt=None, extra_pnginfo=extra, base_model_hint=base_model, low_ram=low_ram)
+        except Exception as e:
+            print(f"[MFlux-ComfyUI] Metadata save failed in Fill: {e}")
             pass
 
         return generated
@@ -768,16 +771,18 @@ class MfluxDepth:
 
         kwargs = dict(
             prompt=prompt,
-            model=model,
+            model_string=model,
             seed=seed,
+            width=iw,
+            height=ih,
             steps=steps,
             guidance=3.5,
             quantize=quantize,
             metadata=metadata,
-            Local_model="",
-            image=imgstub,
-            Loras=Loras,
-            base_model=base_model,
+            model_path="",
+            img2img_pipeline=imgstub,
+            loras_pipeline=Loras,
+            base_model_hint=base_model,
             low_ram=low_ram,
         )
 
@@ -797,7 +802,8 @@ class MfluxDepth:
             "depth_image_path": depth_path,
         }
         try:
-            save_images_with_metadata(generated, prompt, model, quantize, "", seed, ih, iw, steps, 3.5, lora_paths, lora_scales, oriented_path, 1.0, filename_prefix="Mflux", full_prompt=None, extra_pnginfo=extra, base_model=base_model, low_ram=low_ram)
+            # Updated to match new signature with None for ControlNet args
+            save_images_with_metadata(generated, prompt, model, quantize, quantize, "", seed, ih, iw, steps, 3.5, oriented_path, 1.0, lora_paths, lora_scales, None, None, None, filename_prefix="Mflux", full_prompt=None, extra_pnginfo=extra, base_model_hint=base_model, low_ram=low_ram)
         except Exception:
             pass
 
@@ -873,18 +879,20 @@ class MfluxRedux:
 
         generated = generate_image(
             prompt=prompt,
-            model=model,
+            model_string=model,
             seed=seed,
+            width=w, # Added width/height from last oriented copy
+            height=h,
             steps=steps,
             guidance=3.5,
             quantize=quantize,
             metadata=metadata,
-            Local_model="",
-            image=imgstub,
+            model_path="",
+            img2img_pipeline=imgstub,
             redux_image_paths=oriented_paths,
             redux_image_strengths=strengths,
-            Loras=Loras,
-            base_model=base_model,
+            loras_pipeline=Loras,
+            base_model_hint=base_model,
             low_ram=low_ram,
         )
 
@@ -910,7 +918,8 @@ class MfluxRedux:
                     rw, rh = 0, 0
             else:
                 rw, rh = 0, 0
-            save_images_with_metadata(generated, prompt, model, quantize, "", seed, rh or 0, rw or 0, steps, 3.5, lora_paths, lora_scales, imgstub.image_path, 1.0, filename_prefix="Mflux", full_prompt=None, extra_pnginfo=extra, base_model=base_model, low_ram=low_ram)
+            # Updated to match new signature with None for ControlNet args
+            save_images_with_metadata(generated, prompt, model, quantize, quantize, "", seed, rh or 0, rw or 0, steps, 3.5, imgstub.image_path, 1.0, lora_paths, lora_scales, None, None, None, filename_prefix="Mflux", full_prompt=None, extra_pnginfo=extra, base_model_hint=base_model, low_ram=low_ram)
         except Exception:
             pass
 

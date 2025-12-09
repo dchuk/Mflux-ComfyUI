@@ -1,7 +1,22 @@
 try:
     # Normal package import when executed as a package by ComfyUI
-    from .Mflux_Comfy.Mflux_Air import QuickMfluxNode, MfluxModelsLoader, MfluxModelsDownloader, MfluxCustomModels, MfluxZImageNode, MfluxOptimizations
-    from .Mflux_Comfy.Mflux_Pro import MfluxImg2Img, MfluxLorasLoader, MfluxControlNetLoader, MfluxUpscale
+    from .Mflux_Comfy.Mflux_Air import (
+        QuickMfluxNode,
+        MfluxModelsLoader,
+        MfluxModelsDownloader,
+        MfluxCustomModels,
+        MfluxZImageNode,
+        MfluxOptimizations
+    )
+    from .Mflux_Comfy.Mflux_Pro import (
+        MfluxImg2Img,
+        MfluxLorasLoader,
+        MfluxControlNetLoader,
+        MfluxUpscale,
+        MfluxFill,   # Added
+        MfluxDepth,  # Added
+        MfluxRedux   # Added
+    )
 except Exception:
     # Fallback for environments where relative imports fail (e.g., direct execution during tests).
     import os
@@ -12,8 +27,23 @@ except Exception:
         sys.path.insert(0, pkg_root)
     if comfy_root not in sys.path:
         sys.path.insert(0, comfy_root)
-    from Mflux_Comfy.Mflux_Air import QuickMfluxNode, MfluxModelsLoader, MfluxModelsDownloader, MfluxCustomModels, MfluxZImageNode, MfluxOptimizations
-    from Mflux_Comfy.Mflux_Pro import MfluxImg2Img, MfluxLorasLoader, MfluxControlNetLoader, MfluxUpscale
+    from Mflux_Comfy.Mflux_Air import (
+        QuickMfluxNode,
+        MfluxModelsLoader,
+        MfluxModelsDownloader,
+        MfluxCustomModels,
+        MfluxZImageNode,
+        MfluxOptimizations
+    )
+    from Mflux_Comfy.Mflux_Pro import (
+        MfluxImg2Img,
+        MfluxLorasLoader,
+        MfluxControlNetLoader,
+        MfluxUpscale,
+        MfluxFill,   # Added
+        MfluxDepth,  # Added
+        MfluxRedux   # Added
+    )
 
 NODE_CLASS_MAPPINGS = {
     "QuickMfluxNode": QuickMfluxNode,
@@ -26,6 +56,10 @@ NODE_CLASS_MAPPINGS = {
     "MfluxControlNetLoader": MfluxControlNetLoader,
     "MfluxUpscale": MfluxUpscale,
     "MfluxOptimizations": MfluxOptimizations,
+    # New Pro Nodes
+    "MfluxFill": MfluxFill,
+    "MfluxDepth": MfluxDepth,
+    "MfluxRedux": MfluxRedux,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -39,4 +73,8 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "MfluxControlNetLoader": "MFlux ControlNet Loader",
     "MfluxUpscale": "MFlux Upscale",
     "MfluxOptimizations": "MFlux Optimizations",
+    # New Pro Nodes
+    "MfluxFill": "MFlux Fill (Inpainting)",
+    "MfluxDepth": "MFlux Depth",
+    "MfluxRedux": "MFlux Redux",
 }

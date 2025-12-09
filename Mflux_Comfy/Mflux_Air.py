@@ -277,8 +277,6 @@ class QuickMfluxNode:
                 "metadata": ("BOOLEAN", {"default": True}),
             },
             "optional": {
-                # New explicit input dock for connections
-                "model_input": ("STRING", {"forceInput": True, "tooltip": "Connect MfluxModelsLoader or Downloader here. Overrides 'model' text field."}),
                 "Loras": ("MfluxLorasPipeline",),
                 "img2img": ("MfluxImg2ImgPipeline",),
                 "ControlNet": ("MfluxControlNetPipeline",),
@@ -298,18 +296,16 @@ class QuickMfluxNode:
     CATEGORY = "MFlux/Air"
     FUNCTION = "generate"
 
-    def generate(self, prompt, model, seed, width, height, steps, guidance, quantize="Auto", metadata=True, img2img=None, Loras=None, ControlNet=None, base_model="dev", negative_prompt="", optimizations=None, model_input=None, Local_model=None, full_prompt=None, extra_pnginfo=None, size_preset="Custom", apply_size_preset=True, quality_preset="Balanced (25 steps)", apply_quality_preset=True, randomize_seed=True):
+    def generate(self, prompt, model, seed, width, height, steps, guidance, quantize="Auto", metadata=True, img2img=None, Loras=None, ControlNet=None, base_model="dev", negative_prompt="", optimizations=None, Local_model=None, full_prompt=None, extra_pnginfo=None, size_preset="Custom", apply_size_preset=True, quality_preset="Balanced (25 steps)", apply_quality_preset=True, randomize_seed=True):
 
         # Safety check for empty prompt to prevent backend crash
         if not prompt or not prompt.strip():
             print("[MFlux-ComfyUI] Warning: Empty prompt detected. Using fallback '.' to prevent backend crash.")
             prompt = "."
 
-        # Priority: 1. model input (new dock), 2. Local_model (legacy dock), 3. model (text widget)
+        # Priority: 1. Local_model (legacy dock), 2. model (text widget/input)
         final_model = model
-        if model_input and isinstance(model_input, str) and model_input.strip():
-            final_model = model_input
-        elif Local_model and isinstance(Local_model, str) and Local_model.strip():
+        if Local_model and isinstance(Local_model, str) and Local_model.strip():
             final_model = Local_model
 
         final_width, final_height = width, height
@@ -403,8 +399,6 @@ class MfluxZImageNode:
             "optional": {
                 # Full quantization range + Auto
                 "quantize": (["Auto", "None", "3", "4", "5", "6", "8"], {"default": "Auto", "tooltip": "Auto/None = Use model's native weights. Number = Force quantization."}),
-                # New explicit input dock
-                "model_input": ("STRING", {"forceInput": True, "tooltip": "Connect MfluxModelsLoader or Downloader here. Overrides 'model' text field."}),
                 "Loras": ("MfluxLorasPipeline",),
                 "img2img": ("MfluxImg2ImgPipeline",),
                 "optimizations": ("MFLUX_OPTS", {"tooltip": "Connect MfluxOptimizations node here for Low RAM mode."}),
@@ -421,18 +415,16 @@ class MfluxZImageNode:
     CATEGORY = "MFlux/Air"
     FUNCTION = "generate"
 
-    def generate(self, prompt, model, seed, width, height, steps, metadata=True, quantize="Auto", Loras=None, img2img=None, optimizations=None, model_input=None, Local_model=None, full_prompt=None, extra_pnginfo=None):
+    def generate(self, prompt, model, seed, width, height, steps, metadata=True, quantize="Auto", Loras=None, img2img=None, optimizations=None, Local_model=None, full_prompt=None, extra_pnginfo=None):
 
         # Safety check for empty prompt to prevent backend crash
         if not prompt or not prompt.strip():
             print("[MFlux-ComfyUI] Warning: Empty prompt detected. Using fallback '.' to prevent backend crash.")
             prompt = "."
 
-        # Priority: 1. model input, 2. Local_model, 3. model
+        # Priority: 1. Local_model, 2. model
         final_model = model
-        if model_input and isinstance(model_input, str) and model_input.strip():
-            final_model = model_input
-        elif Local_model and isinstance(Local_model, str) and Local_model.strip():
+        if Local_model and isinstance(Local_model, str) and Local_model.strip():
             final_model = Local_model
 
         guidance = 0.0

@@ -77,8 +77,8 @@ class MfluxOptimizations:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "low_ram": ("BOOLEAN", {"default": False, "tooltip": "Enables aggressive memory saving during generation. Can reduce quality on some systems."}),
-                "vae_tiling": ("BOOLEAN", {"default": False, "tooltip": "Splits image decoding to prevent VRAM crashes on large images. Only affects Flux models."}),
+                "low_ram": ("BOOLEAN", {"default": False, "tooltip": "OFF = Fastest. ON = Saves RAM (use for 8GB Macs or 8/16-bit models) but slows generation by ~20%."}),
+                "vae_tiling": ("BOOLEAN", {"default": False, "tooltip": "OFF = Fastest. ON = Prevents crashes at high resolutions (>1536px) or during upscaling."}),
                 "vae_tiling_split": (["horizontal", "vertical"], {"default": "horizontal", "tooltip": "Direction for VAE tiling. 'horizontal' is generally better for avoiding facial seams."}),
             }
         }

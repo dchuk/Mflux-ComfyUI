@@ -39,14 +39,11 @@ def get_full_model_path(model_dir, model_name):
 def download_hg_model(model_version, force_redownload=False):
     if snapshot_download is None:
         raise RuntimeError("huggingface_hub is required. Please install it: pip install huggingface_hub")
-
     repo_id = model_version
     model_checkpoint = get_full_model_path(mflux_dir, model_version)
-
     if os.path.exists(model_checkpoint) and not force_redownload:
         print(f"Model {model_version} found at {model_checkpoint}")
         return model_checkpoint
-
     print(f"Downloading {repo_id} to {model_checkpoint}...")
     snapshot_download(repo_id=repo_id, local_dir=model_checkpoint, local_dir_use_symlinks=False)
     return model_checkpoint
@@ -156,7 +153,6 @@ class MfluxCustomModels:
         model_type_hint = base_model
         if model_type_hint == "z-image-turbo":
             model_type_hint = "z_image_turbo"
-
         save_dir_name = f"Mflux-{model_type_hint}-{quantize}bit-{identifier}"
         save_dir = get_full_model_path(mflux_dir, save_dir_name)
         create_directory(save_dir)
@@ -167,7 +163,6 @@ class MfluxCustomModels:
         # Determine which model class to use based on base_model hint
         target_class = None
         config_base_model = None
-
         if base_model == "qwen":
             target_class = QwenImage
             config_base_model = "qwen-image"
@@ -177,7 +172,8 @@ class MfluxCustomModels:
         elif base_model == "z-image-turbo":
             target_class = ZImageTurbo
             config_base_model = "z-image-turbo"
-        else: # Default to Flux
+        else:
+            # Default to Flux
             target_class = Flux1
             config_base_model = base_model
 
@@ -192,7 +188,6 @@ class MfluxCustomModels:
             lora_paths=lora_paths,
             lora_scales=lora_scales
         )
-
         instance.save_model(save_dir)
         print(f"Model saved to {save_dir}")
         return (save_dir,)
@@ -208,7 +203,7 @@ class MfluxModelsLoader:
                     rel_path = os.path.relpath(root, mflux_dir)
                     # Add Folder Icon
                     local_models.append(f"📁 {rel_path}")
-                    dirs[:] = [] # Stop recursing
+                    dirs[:] = []  # Stop recursing
         local_models.sort(key=str.lower)
 
         # 2. Check System Cache for ALL models
@@ -222,7 +217,6 @@ class MfluxModelsLoader:
         alias_options = [f"☁️ {alias}" for alias in aliases]
 
         final_options = local_models + cached_models + alias_options
-
         return {
             "required": {
                 "model": (final_options or ["None"], {"default": final_options[0] if final_options else "None", "tooltip": "📁 = Local (ComfyUI/models/Mflux)\n🟢 = Cached (HuggingFace System Cache)\n☁️ = Alias/Shortcut (May trigger download)"}),
@@ -297,7 +291,6 @@ class QuickMfluxNode:
     FUNCTION = "generate"
 
     def generate(self, prompt, model, seed, width, height, steps, guidance, quantize="Auto", metadata=True, img2img=None, Loras=None, ControlNet=None, base_model="dev", negative_prompt="", optimizations=None, Local_model=None, full_prompt=None, extra_pnginfo=None, size_preset="Custom", apply_size_preset=True, quality_preset="Balanced (25 steps)", apply_quality_preset=True, randomize_seed=True):
-
         # Safety check for empty prompt to prevent backend crash
         if not prompt or not prompt.strip():
             print("[MFlux-ComfyUI] Warning: Empty prompt detected. Using fallback '.' to prevent backend crash.")
@@ -317,10 +310,22 @@ class QuickMfluxNode:
         vae_tiling_split = optimizations.get("vae_tiling_split", "horizontal") if optimizations else "horizontal"
 
         # Handle Auto quantization
-        q_val = None if quantize in ("Auto", "None") else quantize
+        q_val = None
+        if quantize in ("Auto", "None"):
+            q_val = None
+        else:
+            q_val = quantize
 
         generated_images = generate_image(
-            prompt, final_model, final_seed, final_width, final_height, final_steps, final_guidance, q_val, metadata,
+            prompt,
+            final_model,
+            final_seed,
+            final_width,
+            final_height,
+            final_steps,
+            final_guidance,
+            q_val,
+            metadata,
             model_path=final_model,
             img2img_pipeline=img2img,
             loras_pipeline=Loras,
@@ -416,7 +421,6 @@ class MfluxZImageNode:
     FUNCTION = "generate"
 
     def generate(self, prompt, model, seed, width, height, steps, metadata=True, quantize="Auto", Loras=None, img2img=None, optimizations=None, Local_model=None, full_prompt=None, extra_pnginfo=None):
-
         # Safety check for empty prompt to prevent backend crash
         if not prompt or not prompt.strip():
             print("[MFlux-ComfyUI] Warning: Empty prompt detected. Using fallback '.' to prevent backend crash.")
@@ -430,14 +434,26 @@ class MfluxZImageNode:
         guidance = 0.0
 
         # Handle Auto quantization
-        q_val = None if quantize in ("Auto", "None") else quantize
+        q_val = None
+        if quantize in ("Auto", "None"):
+            q_val = None
+        else:
+            q_val = quantize
 
         low_ram = optimizations.get("low_ram", False) if optimizations else False
         vae_tiling = optimizations.get("vae_tiling", False) if optimizations else False
         vae_tiling_split = optimizations.get("vae_tiling_split", "horizontal") if optimizations else "horizontal"
 
         generated_images = generate_image(
-            prompt, final_model, seed, width, height, steps, guidance, q_val, metadata,
+            prompt,
+            final_model,
+            seed,
+            width,
+            height,
+            steps,
+            guidance,
+            q_val,
+            metadata,
             model_path=final_model,
             img2img_pipeline=img2img,
             loras_pipeline=Loras,
@@ -478,7 +494,7 @@ class MfluxZImageNode:
                 image_strength=image_strength,
                 lora_paths=lora_paths,
                 lora_scales=lora_scales,
-                control_image_path=None, # Z-Image doesn't support ControlNet
+                control_image_path=None,  # Z-Image doesn't support ControlNet
                 control_strength=None,
                 control_model=None,
                 full_prompt=full_prompt,
@@ -489,4 +505,23 @@ class MfluxZImageNode:
                 vae_tiling_split=vae_tiling_split,
                 low_ram=low_ram
             )
+
         return generated_images
+
+class MfluxFiboPrompt:
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                # We explicitly disable dynamicPrompts here so JSON is safe
+                "json_prompt": ("STRING", {"multiline": True, "dynamicPrompts": False, "default": "{}"}),
+            }
+        }
+
+    RETURN_TYPES = ("STRING",)
+    RETURN_NAMES = ("prompt",)
+    CATEGORY = "MFlux/Air"
+    FUNCTION = "get_prompt"
+
+    def get_prompt(self, json_prompt):
+        return (json_prompt,)

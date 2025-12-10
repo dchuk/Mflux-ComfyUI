@@ -6,7 +6,8 @@ try:
         MfluxModelsDownloader,
         MfluxCustomModels,
         MfluxZImageNode,
-        MfluxOptimizations
+        MfluxOptimizations,
+        MfluxFiboPrompt
     )
     from .Mflux_Comfy.Mflux_Pro import (
         MfluxImg2Img,
@@ -33,7 +34,8 @@ except Exception:
         MfluxModelsDownloader,
         MfluxCustomModels,
         MfluxZImageNode,
-        MfluxOptimizations
+        MfluxOptimizations,
+        MfluxFiboPrompt
     )
     from Mflux_Comfy.Mflux_Pro import (
         MfluxImg2Img,
@@ -60,6 +62,7 @@ NODE_CLASS_MAPPINGS = {
     "MfluxFill": MfluxFill,
     "MfluxDepth": MfluxDepth,
     "MfluxRedux": MfluxRedux,
+    "MfluxFiboPrompt": MfluxFiboPrompt,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -77,4 +80,5 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "MfluxFill": "MFlux Fill (Inpainting)",
     "MfluxDepth": "MFlux Depth",
     "MfluxRedux": "MFlux Redux",
+    "MfluxFiboPrompt": "MFlux Fibo JSON Prompt",
 }

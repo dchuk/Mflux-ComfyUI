@@ -1,4 +1,6 @@
 import os
+import time
+import uuid
 from PIL import Image, ImageOps
 import folder_paths
 import numpy as np
@@ -35,6 +37,36 @@ if ControlnetUtil is None:
         @staticmethod
         def scale_image(h, w, img):
             return img.resize((w, h), Image.BICUBIC)
+
+def _save_tensor_to_temp(tensor, filename_prefix="mflux_temp", is_mask=False):
+    """
+    Converts a ComfyUI tensor (IMAGE or MASK) to a temporary PNG file
+    and returns the absolute path.
+    """
+    in_dir = folder_paths.get_input_directory()
+    fname = f"{filename_prefix}_{int(time.time()*1000)}_{uuid.uuid4().hex[:6]}.png"
+    out_path = os.path.join(in_dir, fname)
+
+    # Convert Tensor to Numpy
+    array = tensor.cpu().numpy()
+
+    if is_mask:
+        # Handle Mask: Expecting [H, W] or [1, H, W] -> convert to [H, W] 0..255
+        if array.ndim == 3:
+            array = array[0] # Take batch 0
+        array = np.clip(array * 255.0, 0, 255).astype(np.uint8)
+        img = Image.fromarray(array, mode='L')
+    else:
+        # Handle Image: Expecting [1, H, W, 3] -> convert to [H, W, 3] 0..255
+        if array.ndim == 4:
+            array = array[0]
+
+        # Clip and convert
+        array = np.clip(array * 255.0, 0, 255).astype(np.uint8)
+        img = Image.fromarray(array, mode='RGB')
+
+    img.save(out_path)
+    return out_path
 
 class MfluxImg2ImgPipeline:
     def __init__(self, image_path, image_strength):
@@ -503,9 +535,6 @@ class MfluxUpscale:
         # Upscale accepts a ComfyUI IMAGE tensor as the source. Convert and save it into the input directory.
         control_image_path = None
         try:
-            import time
-            import uuid
-            import numpy as _np
             in_dir = folder_paths.get_input_directory()
             fname = f"from_tensor_{int(time.time()*1000)}_{uuid.uuid4().hex[:6]}.png"
             out_path = os.path.join(in_dir, fname)
@@ -523,9 +552,9 @@ class MfluxUpscale:
                     elif hasattr(input_image, 'numpy'):
                         np_img = input_image.numpy()
                     else:
-                        np_img = _np.array(input_image)
+                        np_img = np.array(input_image)
                 except Exception:
-                    np_img = _np.array(input_image)
+                    np_img = np.array(input_image)
 
             # Typical ComfyUI IMAGE tensor shape: [B, H, W, C] with float32 in 0..1
             if np_img is None:
@@ -534,18 +563,18 @@ class MfluxUpscale:
                 np_img = np_img[0]
             # If channels-first [C,H,W], transpose to HWC
             if np_img.ndim == 3 and (np_img.shape[0] == 1 or np_img.shape[0] == 3 or np_img.shape[0] == 4) and np_img.shape[2] not in (1,3,4):
-                np_img = _np.transpose(np_img, (1, 2, 0))
+                np_img = np.transpose(np_img, (1, 2, 0))
             # Normalize floats to 0..255
-            if _np.issubdtype(np_img.dtype, _np.floating):
-                np_img = _np.clip(np_img, 0.0, 1.0)
-                np_img = (np_img * 255.0).astype(_np.uint8)
-            elif not _np.issubdtype(np_img.dtype, _np.uint8):
-                np_img = np_img.astype(_np.uint8)
+            if np.issubdtype(np_img.dtype, np.floating):
+                np_img = np.clip(np_img, 0.0, 1.0)
+                np_img = (np_img * 255.0).astype(np.uint8)
+            elif not np.issubdtype(np_img.dtype, np.uint8):
+                np_img = np_img.astype(np.uint8)
             # Ensure HWC with 3 channels
             if np_img.ndim == 2:
-                np_img = _np.stack([np_img] * 3, axis=-1)
+                np_img = np.stack([np_img] * 3, axis=-1)
             if np_img.ndim == 3 and np_img.shape[2] == 1:
-                np_img = _np.repeat(np_img, 3, axis=2)
+                np_img = np.repeat(np_img, 3, axis=2)
 
                 Image.fromarray(np_img).save(out_path)
                 control_image_path = out_path
@@ -917,5 +946,74 @@ class MfluxRedux:
             save_images_with_metadata(generated, prompt, model, quantize, "", seed, rh or 0, rw or 0, steps, 3.5, image_path=imgstub.image_path, image_strength=1.0, lora_paths=lora_paths, lora_scales=lora_scales, control_image_path=None, control_strength=None, control_model=None, filename_prefix="Mflux", full_prompt=None, extra_pnginfo=extra, base_model_hint=base_model, low_ram=low_ram)
         except Exception:
             pass
+
+        return generated
+
+class MfluxZImageInpaint:
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "image": ("IMAGE", {"tooltip": "The source image to inpaint."}),
+                "mask": ("MASK", {"tooltip": "The mask defining the area to regenerate (White = Inpaint)."}),
+                "prompt": ("STRING", {"multiline": True, "dynamicPrompts": True, "default": "A woman smiling"}),
+                "model": ("STRING", {"default": "filipstrand/Z-Image-Turbo-mflux-4bit", "tooltip": "The Z-Image Turbo model path or ID."}),
+                "steps": ("INT", {"default": 9, "min": 1, "max": 50, "tooltip": "Z-Image Turbo works best around 4-10 steps."}),
+                "seed": ("INT", {"default": -1, "min": -1, "max": 0xffffffffffffffff}),
+            },
+            "optional": {
+                "quantize": (["Auto", "None", "3", "4", "5", "6", "8"], {"default": "Auto"}),
+                "low_ram": ("BOOLEAN", {"default": False, "tooltip": "Enable for 8GB/16GB Macs."}),
+                "metadata": ("BOOLEAN", {"default": True}),
+                "Loras": ("MfluxLorasPipeline",),
+            }
+        }
+
+    RETURN_TYPES = ("IMAGE",)
+    FUNCTION = "generate"
+    CATEGORY = "MFlux/Pro"
+
+    def generate(self, image, mask, prompt, model, steps, seed, quantize="Auto", low_ram=False, metadata=True, Loras=None):
+        # 1. Convert Inputs to Temp Files
+        image_path = _save_tensor_to_temp(image, filename_prefix="z_src")
+        mask_path = _save_tensor_to_temp(mask, filename_prefix="z_mask", is_mask=True)
+
+        # 2. Orient them (Standardizes EXIF rotation)
+        oriented_image, w, h = _make_oriented_copy(image_path)
+        oriented_mask, _, _ = _make_oriented_copy(mask_path)
+
+        # 3. Create pipeline stub for Mflux_Core
+        class _ImgStub:
+            def __init__(self, path):
+                self.image_path = path
+                self.image_strength = 1.0
+
+        imgstub = _ImgStub(oriented_image)
+
+        # 4. Import Core Generation
+        try:
+            from .Mflux_Core import generate_image
+        except ImportError:
+            from Mflux_Comfy.Mflux_Core import generate_image
+
+        # 5. Run Generation
+        # base_model_hint="z-image-turbo" ensures the correct model class is loaded.
+        # providing masked_image_path triggers the inpainting logic in generate_image.
+        generated = generate_image(
+            prompt=prompt,
+            model_string=model,
+            seed=seed,
+            width=w,
+            height=h,
+            steps=steps,
+            guidance=0.0, # Z-Image Turbo does not use CFG guidance
+            quantize=quantize,
+            metadata=metadata,
+            img2img_pipeline=imgstub,
+            masked_image_path=oriented_mask,
+            loras_pipeline=Loras,
+            base_model_hint="z-image-turbo",
+            low_ram=low_ram
+        )
 
         return generated

@@ -1,35 +1,46 @@
 import sys
 import torch
-import importlib
 import os
 
-# Only run on Mac (MPS)
-if torch.backends.mps.is_available():
-    print("🍎 [MFlux] Detecting MacOS... Attempting to patch SAM3 for compatibility.")
+def apply_mps_patch():
+    # Only run on Mac/MPS
+    if not torch.backends.mps.is_available():
+        return
 
-    # 1. Helper to find the SAM3 module regardless of folder name
-    def find_sam3_module():
-        # Check if already loaded in memory
-        for key in sys.modules.keys():
-            if "sam3_lib.model.decoder" in key:
-                return key.split(".nodes")[0]
+    print("🍎 [MFlux] Detecting MacOS/MPS... Scanning for SAM3 modules to patch.")
 
-        # If not loaded, look in custom_nodes
-        try:
-            import folder_paths
-            base_path = folder_paths.get_folder_paths("custom_nodes")[0]
-            for item in os.listdir(base_path):
-                if os.path.isdir(os.path.join(base_path, item)):
-                    if os.path.exists(os.path.join(base_path, item, "nodes", "sam3_lib", "__init__.py")):
-                        return f"custom_nodes.{item}"
-        except:
-            pass
-        return None
+    decoder_mod = None
+    geo_mod = None
 
-    # 2. Define the fixed methods
-    def get_fixed_decoder_method(decoder_module):
-        box_cxcywh_to_xyxy = decoder_module.box_cxcywh_to_xyxy
-        activation_ckpt_wrapper = decoder_module.activation_ckpt_wrapper
+    # Scan loaded modules for the specific SAM3 files we know exist
+    # based on the directory structure: nodes/sam3_lib/model/...
+    for mod in list(sys.modules.values()):
+        if not hasattr(mod, '__file__') or not mod.__file__:
+            continue
+
+        # Normalize path separators
+        fpath = mod.__file__.replace("\\", "/")
+
+        if fpath.endswith("nodes/sam3_lib/model/decoder.py"):
+            decoder_mod = mod
+        elif fpath.endswith("nodes/sam3_lib/model/geometry_encoders.py"):
+            geo_mod = mod
+
+        if decoder_mod and geo_mod:
+            break
+
+    if not decoder_mod or not geo_mod:
+        print("⚠️ [MFlux] SAM3 modules not found in memory. Patch skipped.")
+        return
+
+    print(f"🍎 [MFlux] Found SAM3 Decoder at: {decoder_mod.__file__}")
+
+    # --- DEFINE FIXES ---
+
+    def fix_decoder(mod):
+        # Grab dependencies directly from the found module
+        box_cxcywh_to_xyxy = mod.box_cxcywh_to_xyxy
+        activation_ckpt_wrapper = mod.activation_ckpt_wrapper
 
         def _get_rpb_matrix_fixed(self, reference_boxes, feat_size):
             H, W = feat_size
@@ -47,11 +58,11 @@ if torch.backends.mps.is_available():
                     self.coord_cache[feat_size] = self._get_coords(H, W, reference_boxes.device)
                 coords_h, coords_w = self.coord_cache[feat_size]
 
-            # --- FIX: Ensure devices match ---
+            # --- FIX 1: Ensure devices match ---
             if coords_h.device != reference_boxes.device:
                 coords_h = coords_h.to(reference_boxes.device)
                 coords_w = coords_w.to(reference_boxes.device)
-            # ---------------------------------
+            # -----------------------------------
 
             deltas_y = coords_h.view(1, -1, 1) - boxes_xyxy.reshape(-1, 1, 4)[:, :, 1:4:2]
             deltas_y = deltas_y.view(bs, num_queries, -1, 2)
@@ -77,21 +88,19 @@ if torch.backends.mps.is_available():
             B = deltas_y.unsqueeze(3) + deltas_x.unsqueeze(2)
             B = B.flatten(2, 3).permute(0, 3, 1, 2).contiguous()
             return B
-
         return _get_rpb_matrix_fixed
 
-    def get_fixed_geometry_functions(geo_module):
-        # FIX: concat_padded_sequences without async assert
+    def fix_geometry(mod):
+        # FIX 2: Removed assert_async
         def concat_padded_sequences_fixed(seq1, mask1, seq2, mask2, return_index: bool = False):
             seq1_length, batch_size, hidden_size = seq1.shape
             seq2_length, batch_size, hidden_size = seq2.shape
-
-            # --- FIX: Removed torch._assert_async calls ---
 
             actual_seq1_lengths = (~mask1).sum(dim=-1)
             actual_seq2_lengths = (~mask2).sum(dim=-1)
             final_lengths = actual_seq1_lengths + actual_seq2_lengths
             max_length = seq1_length + seq2_length
+            concatenated_mask = (torch.arange(max_length, device=seq2.device)[None].repeat(batch_size, 1) >= final_lengths[:, None])
 
             concatenated_sequence = torch.zeros((max_length, batch_size, hidden_size), device=seq2.device, dtype=seq2.dtype)
             concatenated_sequence[:seq1_length, :, :] = seq1
@@ -100,18 +109,18 @@ if torch.backends.mps.is_available():
             index = index + actual_seq1_lengths[None]
             concatenated_sequence = concatenated_sequence.scatter(0, index[:, :, None].expand(-1, -1, hidden_size), seq2)
 
-            concatenated_mask = (torch.arange(max_length, device=seq2.device)[None].repeat(batch_size, 1) >= final_lengths[:, None])
-
             if return_index:
                 return concatenated_sequence, concatenated_mask, index
             return concatenated_sequence, concatenated_mask
 
-        # FIX: _encode_points with 0-length check
+        # FIX 3: Empty points check (Fixes your specific crash)
         def _encode_points_fixed(self, points, points_mask, points_labels, img_feats):
             n_points, bs = points.shape[:2]
-            # --- FIX: Early return for empty points ---
+
+            # --- CRITICAL FIX: Handle empty points ---
             if n_points == 0:
                 return torch.zeros(0, bs, self.d_model, device=points.device), points_mask
+            # -----------------------------------------
 
             points_embed = None
             if self.points_direct_project is not None:
@@ -138,22 +147,20 @@ if torch.backends.mps.is_available():
 
         return concat_padded_sequences_fixed, _encode_points_fixed
 
-    # 3. Apply Patch
-    sam3_root = find_sam3_module()
-    if sam3_root:
-        try:
-            import numpy as np # Helper needed inside the closure
-            decoder_mod = importlib.import_module(f"{sam3_root}.nodes.sam3_lib.model.decoder")
-            geo_mod = importlib.import_module(f"{sam3_root}.nodes.sam3_lib.model.geometry_encoders")
+    # --- APPLY ---
+    try:
+        # Patch Decoder
+        decoder_mod.TransformerDecoder._get_rpb_matrix = fix_decoder(decoder_mod)
 
-            # Apply patches
-            decoder_mod.TransformerDecoder._get_rpb_matrix = get_fixed_decoder_method(decoder_mod)
-            concat_fixed, encode_fixed = get_fixed_geometry_functions(geo_mod)
-            geo_mod.concat_padded_sequences = concat_fixed
-            geo_mod.SequenceGeometryEncoder._encode_points = encode_fixed
+        # Patch Geometry
+        concat_fn, encode_fn = fix_geometry(geo_mod)
+        geo_mod.concat_padded_sequences = concat_fn
+        geo_mod.SequenceGeometryEncoder._encode_points = encode_fn
 
-            print("✅ [MFlux] SAM3 patched successfully for MPS.")
-        except Exception as e:
-            print(f"⚠️ [MFlux] Failed to patch SAM3: {e}")
-    else:
-        print("⚠️ [MFlux] SAM3 nodes not found. Skipping patch.")
+        print("✅ [MFlux] SAM3 patched successfully for MPS.")
+    except Exception as e:
+        print(f"❌ [MFlux] Error applying patches: {e}")
+        import traceback
+        traceback.print_exc()
+
+apply_mps_patch()

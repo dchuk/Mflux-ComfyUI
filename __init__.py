@@ -16,7 +16,8 @@ try:
         MfluxUpscale,
         MfluxFill,   # Added
         MfluxDepth,  # Added
-        MfluxRedux   # Added
+        MfluxRedux,  # Added
+        MfluxZImageInpaint # Added
     )
 except Exception:
     # Fallback for environments where relative imports fail (e.g., direct execution during tests).
@@ -44,7 +45,8 @@ except Exception:
         MfluxUpscale,
         MfluxFill,   # Added
         MfluxDepth,  # Added
-        MfluxRedux   # Added
+        MfluxRedux,  # Added
+        MfluxZImageInpaint # Added
     )
 
 NODE_CLASS_MAPPINGS = {
@@ -63,6 +65,7 @@ NODE_CLASS_MAPPINGS = {
     "MfluxDepth": MfluxDepth,
     "MfluxRedux": MfluxRedux,
     "MfluxFiboPrompt": MfluxFiboPrompt,
+    "MfluxZImageInpaint": MfluxZImageInpaint,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -81,4 +84,5 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "MfluxDepth": "MFlux Depth",
     "MfluxRedux": "MFlux Redux",
     "MfluxFiboPrompt": "MFlux Fibo JSON Prompt",
+    "MfluxZImageInpaint": "MFlux Z-Image Inpaint (Turbo)",
 }

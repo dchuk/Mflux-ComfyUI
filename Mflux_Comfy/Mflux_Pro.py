@@ -954,16 +954,20 @@ class MfluxZImageInpaint:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "image": ("IMAGE", {"tooltip": "The source image to inpaint."}),
-                "mask": ("MASK", {"tooltip": "The mask defining the area to regenerate (White = Inpaint)."}),
+                # This receives 'cropped_image' from the Crop node
+                "image": ("IMAGE", {"tooltip": "The source image (or crop) to inpaint."}),
+                # This receives 'cropped_mask' from the Crop node
+                "mask": ("MASK", {"tooltip": "The mask defining the area to regenerate."}),
                 "prompt": ("STRING", {"multiline": True, "dynamicPrompts": True, "default": "A woman smiling"}),
-                "model": ("STRING", {"default": "filipstrand/Z-Image-Turbo-mflux-4bit", "tooltip": "The Z-Image Turbo model path or ID."}),
-                "steps": ("INT", {"default": 9, "min": 1, "max": 50, "tooltip": "Z-Image Turbo works best around 4-10 steps."}),
+                "model": ("STRING", {"default": "filipstrand/Z-Image-Turbo-mflux-4bit", "tooltip": "The Z-Image Turbo model path."}),
+                "steps": ("INT", {"default": 9, "min": 1, "max": 50, "tooltip": "Steps."}),
+                # ADDED: Essential for Z-Image Inpainting
+                "strength": ("FLOAT", {"default": 0.65, "min": 0.0, "max": 1.0, "step": 0.01, "tooltip": "Denoising strength. 0.6-0.7 is usually good for inpainting."}),
                 "seed": ("INT", {"default": -1, "min": -1, "max": 0xffffffffffffffff}),
             },
             "optional": {
                 "quantize": (["Auto", "None", "3", "4", "5", "6", "8"], {"default": "Auto"}),
-                "low_ram": ("BOOLEAN", {"default": False, "tooltip": "Enable for 8GB/16GB Macs."}),
+                "low_ram": ("BOOLEAN", {"default": False}),
                 "metadata": ("BOOLEAN", {"default": True}),
                 "Loras": ("MfluxLorasPipeline",),
             }
@@ -973,47 +977,73 @@ class MfluxZImageInpaint:
     FUNCTION = "generate"
     CATEGORY = "MFlux/Pro"
 
-    def generate(self, image, mask, prompt, model, steps, seed, quantize="Auto", low_ram=False, metadata=True, Loras=None):
-        # 1. Convert Inputs to Temp Files
+    def generate(self, image, mask, prompt, model, steps, strength, seed, quantize="Auto", low_ram=False, metadata=True, Loras=None):
+        # 1. Save the input (the cropped image) to a temp file for the backend
         image_path = _save_tensor_to_temp(image, filename_prefix="z_src")
-        mask_path = _save_tensor_to_temp(mask, filename_prefix="z_mask", is_mask=True)
 
-        # 2. Orient them (Standardizes EXIF rotation)
+        # 2. Orient image
         oriented_image, w, h = _make_oriented_copy(image_path)
-        oriented_mask, _, _ = _make_oriented_copy(mask_path)
 
-        # 3. Create pipeline stub for Mflux_Core
+        # 3. Create pipeline stub. We pass the 'strength' here.
+        # This tells the backend "Use this image as a starting point, but change it by X amount"
         class _ImgStub:
-            def __init__(self, path):
+            def __init__(self, path, str_val):
                 self.image_path = path
-                self.image_strength = 1.0
+                self.image_strength = str_val
 
-        imgstub = _ImgStub(oriented_image)
+        imgstub = _ImgStub(oriented_image, strength)
 
-        # 4. Import Core Generation
+        # 4. Import Core
         try:
             from .Mflux_Core import generate_image
         except ImportError:
             from Mflux_Comfy.Mflux_Core import generate_image
 
-        # 5. Run Generation
-        # base_model_hint="z-image-turbo" ensures the correct model class is loaded.
-        # providing masked_image_path triggers the inpainting logic in generate_image.
-        generated = generate_image(
+        # 5. Run Generation (Standard Img2Img)
+        # CRITICAL: We DO NOT pass 'masked_image_path'. This prevents the crash.
+        # The model will generate a new version of the FULL crop.
+        generated_tuple = generate_image(
             prompt=prompt,
             model_string=model,
             seed=seed,
             width=w,
             height=h,
             steps=steps,
-            guidance=0.0, # Z-Image Turbo does not use CFG guidance
+            guidance=0.0,
             quantize=quantize,
             metadata=metadata,
             img2img_pipeline=imgstub,
-            masked_image_path=oriented_mask,
+            # masked_image_path=...  <-- Omitted to allow Z-Image to work
             loras_pipeline=Loras,
             base_model_hint="z-image-turbo",
             low_ram=low_ram
         )
 
-        return generated
+        generated_image = generated_tuple[0] # The model's output (The whole crop regenerated)
+
+        # 6. Apply the Mask (The Fix)
+        # We take the model's output and the original input.
+        # Wherever the mask is Black (0), we force the original pixels back.
+        # Wherever the mask is White (1), we keep the new Z-Image pixels.
+
+        # Prepare mask dimensions for broadcasting
+        # ComfyUI masks are usually [H, W] or [B, H, W]. We need [B, H, W, 1]
+        if mask.dim() == 2:
+            mask = mask.unsqueeze(0).unsqueeze(-1)
+        elif mask.dim() == 3:
+            mask = mask.unsqueeze(-1)
+
+        # Resize mask to match generated image dimensions if they differ slightly
+        # (This happens sometimes with rounding in Mflux resolution calculations)
+        if mask.shape[1] != generated_image.shape[1] or mask.shape[2] != generated_image.shape[2]:
+             import torch.nn.functional as F
+             mask_ch = mask.permute(0, 3, 1, 2) # [B, C, H, W]
+             mask_ch = F.interpolate(mask_ch, size=(generated_image.shape[1], generated_image.shape[2]), mode='bilinear', align_corners=False)
+             mask = mask_ch.permute(0, 2, 3, 1) # Back to [B, H, W, C]
+
+        # COMPOSITE:
+        # This ensures the borders of the crop remain perfectly identical to the original,
+        # allowing the "Inpaint Stitch" node to put it back into the main image seamlessly.
+        composited_image = generated_image * mask + image * (1.0 - mask)
+
+        return (composited_image,)

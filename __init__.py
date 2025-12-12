@@ -1,5 +1,6 @@
 try:
     # Normal package import when executed as a package by ComfyUI
+    from .Mflux_Comfy import sam3_mps_fix
     from .Mflux_Comfy.Mflux_Air import (
         QuickMfluxNode,
         MfluxModelsLoader,

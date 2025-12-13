@@ -966,6 +966,8 @@ class MfluxZImageInpaint:
                 "seed": ("INT", {"default": -1, "min": -1, "max": 0xffffffffffffffff}),
             },
             "optional": {
+                # ADDED: Visualization Toggle
+                "output_noise_preview": ("BOOLEAN", {"default": False, "label_on": "true", "label_off": "false", "tooltip": "Visualize the noise mixed with the image based on strength. Helps tune how much structure the model sees."}),
                 "quantize": (["Auto", "None", "3", "4", "5", "6", "8"], {"default": "Auto"}),
                 "low_ram": ("BOOLEAN", {"default": False}),
                 "metadata": ("BOOLEAN", {"default": True}),
@@ -977,7 +979,26 @@ class MfluxZImageInpaint:
     FUNCTION = "generate"
     CATEGORY = "MFlux/Pro"
 
-    def generate(self, image, mask, prompt, model, steps, strength, seed, quantize="Auto", low_ram=False, metadata=True, Loras=None):
+    def generate(self, image, mask, prompt, model, steps, strength, seed, output_noise_preview=False, quantize="Auto", low_ram=False, metadata=True, Loras=None):
+
+        # --- VISUALIZATION LOGIC START ---
+        # If the user wants to see the "Latent Input", we simulate it here.
+        # This helps tuning 'strength'.
+        if output_noise_preview:
+            # 1. Create random noise (simulating the diffusion noise)
+            noise = torch.randn_like(image)
+
+            # 2. Mix based on strength (Linear interpolation approximation)
+            # Strength 0.0 = Pure Image
+            # Strength 1.0 = Pure Noise
+            noisy_preview = (image * (1.0 - strength)) + (noise * strength)
+
+            # 3. Clip to valid image range
+            noisy_preview = torch.clamp(noisy_preview, 0.0, 1.0)
+
+            return (noisy_preview,)
+        # --- VISUALIZATION LOGIC END ---
+
         # 1. Save the input (the cropped image) to a temp file for the backend
         image_path = _save_tensor_to_temp(image, filename_prefix="z_src")
 

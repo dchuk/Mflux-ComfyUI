@@ -4,7 +4,7 @@ version = "2.1.0"
 description = "Mflux integration for ComfyUI"
 license = { file = "LICENSE" }
 dependencies = [
-    "mflux==0.13.1",
+    "mflux==0.15.5",
     "huggingface_hub>=0.26.0",
 ]
 

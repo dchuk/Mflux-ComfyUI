@@ -25,7 +25,7 @@ try:
     if _skip_mflux_import:
         raise ImportError("Skipping Mflux import via env var")
     from mflux.models.common.config import ModelConfig
-    # Removed 'from mflux.config.config import Config' as it causes ImportError in 0.13.1
+    from mflux.models.common.config.config import Config
     from mflux.callbacks.callback_registry import CallbackRegistry
     from mflux.models.flux.variants.txt2img.flux import Flux1
     from mflux.models.flux.variants.controlnet.flux_controlnet import Flux1Controlnet
@@ -45,7 +45,7 @@ try:
 except ImportError as e:
     # Print the error so the user knows WHY it failed (e.g. version mismatch)
     print(f"!! [MFlux-ComfyUI] Import Error: {e}")
-    print("!! [MFlux-ComfyUI] Please ensure you have 'mflux==0.13.1' installed.")
+    print("!! [MFlux-ComfyUI] Please ensure you have 'mflux==0.15.5' installed.")
 
     # Define dummy classes so isinstance() checks don't fail in tests/CI
     class _DummyModel: pass
@@ -64,10 +64,12 @@ except ImportError as e:
     ControlnetUtil = None
     MemorySaver = None
 
-# Define Config stub outside the try/except block so it's always available for tests if needed
-class Config(dict):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
+# Config is now imported from mflux.models.common.config.config in the try block above
+# Fallback definition for when mflux imports fail
+if 'Config' not in dir():
+    class Config(dict):
+        def __init__(self, **kwargs):
+            super().__init__(**kwargs)
 
 from .Mflux_Pro import MfluxControlNetPipeline
 
@@ -142,7 +144,7 @@ def load_or_create_model(model_string, quantize, model_path, lora_paths, lora_sc
         raise ImportError(
             "MFlux dependencies are not loaded correctly. "
             "Please check your console logs for import errors. "
-            "Ensure you have installed 'mflux==0.13.1' in your ComfyUI environment."
+            "Ensure you have installed 'mflux==0.15.5' in your ComfyUI environment."
         )
 
     effective_model_path = model_path if model_path else None

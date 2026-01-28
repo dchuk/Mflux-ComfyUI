@@ -10,6 +10,9 @@ import comfy.utils
 from importlib import import_module
 import gc # Added for garbage collection
 
+from .utils.tensor_utils import pil_to_comfy_tensor
+from .utils.memory_utils import clear_mlx_memory
+
 # --- MFLUX Imports with Guards ---
 _skip_mlx_import = os.environ.get("MFLUX_COMFY_DISABLE_MLX_IMPORT") == "1"
 _skip_mflux_import = os.environ.get("MFLUX_COMFY_DISABLE_MFLUX_IMPORT") == "1"
@@ -326,17 +329,17 @@ def generate_image(prompt, model_string, seed, width, height, steps, guidance, q
             print("[MFlux-ComfyUI] Low RAM mode: Clearing model cache to free resources and reset state.")
             model_cache.clear()
             gc.collect()
+            clear_mlx_memory()
 
     if hasattr(generated_result, "image"):
         pil_image = generated_result.image
     else:
         pil_image = generated_result
 
-    image_np = np.array(pil_image).astype(np.float32) / 255.0
-    image_tensor = torch.from_numpy(image_np)
+    image_tensor = pil_to_comfy_tensor(pil_image)
 
-    if image_tensor.dim() == 3:
-        image_tensor = image_tensor.unsqueeze(0)
+    # Always clear MLX cache after generation to prevent memory accumulation
+    clear_mlx_memory()
 
     return (image_tensor,)
 

@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-01-27)
 
 **Core value:** Mac users can generate images with mflux models through ComfyUI's node interface
-**Current focus:** Phase 2 - Z-Image Turbo - COMPLETE
+**Current focus:** Phase 3 - SeedVR2 Upscaling - COMPLETE
 
 ## Current Position
 
-Phase: 2 of 4 (Z-Image Turbo) - COMPLETE
+Phase: 3 of 4 (SeedVR2 Upscaling) - COMPLETE
 Plan: 1 of 1 in current phase
 Status: Phase complete
-Last activity: 2026-01-28 - Completed 02-01-PLAN.md
+Last activity: 2026-01-28 - Completed 03-01-PLAN.md
 
-Progress: [####......] 40%
+Progress: [######....] 60%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 2
-- Average duration: 4.5 min
-- Total execution time: 9 min
+- Total plans completed: 3
+- Average duration: 4.3 min
+- Total execution time: 13 min
 
 **By Phase:**
 
@@ -29,12 +29,12 @@ Progress: [####......] 40%
 |-------|-------|-------|----------|
 | 1. Foundation | 1/1 | 5min | 5min |
 | 2. Z-Image Turbo | 1/1 | 4min | 4min |
-| 3. SeedVR2 Upscaling | 0/1 | - | - |
+| 3. SeedVR2 Upscaling | 1/1 | 4min | 4min |
 | 4. Polish | 0/2 | - | - |
 
 **Recent Trend:**
-- Last 5 plans: 01-01 (5min), 02-01 (4min)
-- Trend: (improving)
+- Last 5 plans: 01-01 (5min), 02-01 (4min), 03-01 (4min)
+- Trend: (stable)
 
 *Updated after each plan completion*
 
@@ -54,6 +54,9 @@ Recent decisions affecting current work:
 | Platform gating via _is_apple_silicon() | Silent non-registration on non-Apple Silicon | 02-01 |
 | ZIMAGE_MODEL custom type | Type safety for loader-to-sampler connection | 02-01 |
 | Denoise 0-1 mapping | User-friendly (0=keep, 1=ignore) internally mapped to image_strength | 02-01 |
+| Temp file bridge for file-path APIs | SeedVR2 requires file path, save tensor to temp | 03-01 |
+| SEEDVR2_MODEL custom type | Type safety for loader-upscaler connection | 03-01 |
+| CATEGORY='mflux' for all nodes | Keep all mflux nodes together in browser | 03-01 |
 
 ### Pending Todos
 
@@ -61,12 +64,12 @@ None.
 
 ### Blockers/Concerns
 
-- **Phase 3 (SeedVR2):** API verification needed - mflux docs show CLI only, Python API may need discovery during planning
+None - all phases 1-3 complete, ready for Phase 4 (Polish).
 
 ## Session Continuity
 
-Last session: 2026-01-28T09:07:10Z
-Stopped at: Completed 02-01-PLAN.md (Phase 2 complete)
+Last session: 2026-01-28T09:14:00Z
+Stopped at: Completed 03-01-PLAN.md (Phase 3 complete)
 Resume file: None
 
 ---

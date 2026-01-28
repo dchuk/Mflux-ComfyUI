@@ -13,15 +13,15 @@ Requirements for initial release. Each maps to roadmap phases.
 - [x] **INFRA-02**: Tensor conversion utility converts ComfyUI tensor to PIL Image
 - [x] **INFRA-03**: MLX memory is cleared after each generation to prevent OOM
 - [ ] **INFRA-04**: Package installs correctly via ComfyUI custom node manager
-- [ ] **INFRA-05**: All nodes appear in ComfyUI node browser under "mflux" category
+- [x] **INFRA-05**: All nodes appear in ComfyUI node browser under "mflux" category
 
 ### Z-Image Turbo
 
-- [ ] **ZIMG-01**: User can load Z-Image Turbo model with quantization selection (4-bit, 8-bit, none)
-- [ ] **ZIMG-02**: User can generate image from text prompt using loaded model
-- [ ] **ZIMG-03**: User can specify seed, steps, width, height for generation
-- [ ] **ZIMG-04**: User can use input image for img2img generation with strength control
-- [ ] **ZIMG-05**: Generated image outputs as standard ComfyUI IMAGE type
+- [x] **ZIMG-01**: User can load Z-Image Turbo model with quantization selection (4-bit, 8-bit, none)
+- [x] **ZIMG-02**: User can generate image from text prompt using loaded model
+- [x] **ZIMG-03**: User can specify seed, steps, width, height for generation
+- [x] **ZIMG-04**: User can use input image for img2img generation with strength control
+- [x] **ZIMG-05**: Generated image outputs as standard ComfyUI IMAGE type
 
 ### SeedVR2 Upscaling
 
@@ -76,12 +76,12 @@ Which phases cover which requirements. Updated during roadmap creation.
 | INFRA-02 | Phase 1 | Complete |
 | INFRA-03 | Phase 1 | Complete |
 | INFRA-04 | Phase 4 | Pending |
-| INFRA-05 | Phase 2 | Pending |
-| ZIMG-01 | Phase 2 | Pending |
-| ZIMG-02 | Phase 2 | Pending |
-| ZIMG-03 | Phase 2 | Pending |
-| ZIMG-04 | Phase 2 | Pending |
-| ZIMG-05 | Phase 2 | Pending |
+| INFRA-05 | Phase 2 | Complete |
+| ZIMG-01 | Phase 2 | Complete |
+| ZIMG-02 | Phase 2 | Complete |
+| ZIMG-03 | Phase 2 | Complete |
+| ZIMG-04 | Phase 2 | Complete |
+| ZIMG-05 | Phase 2 | Complete |
 | UPSC-01 | Phase 3 | Pending |
 | UPSC-02 | Phase 3 | Pending |
 | UPSC-03 | Phase 3 | Pending |
@@ -99,4 +99,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-01-27*
-*Last updated: 2026-01-28 after Phase 1 completion*
+*Last updated: 2026-01-28 after Phase 2 completion*

@@ -1,1 +1,2 @@
-mflux==0.10.0
+mflux==0.13.1
+huggingface_hub>=0.26.0

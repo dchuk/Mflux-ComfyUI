@@ -1,16 +1,31 @@
 import os
+import time
+import uuid
 from PIL import Image, ImageOps
 import folder_paths
 import numpy as np
 import torch
 
-# Try to import ControlnetUtil from mflux; if unavailable or missing helpers, provide a local fallback
-try:
-    from mflux.controlnet.controlnet_util import ControlnetUtil  # type: ignore
-    if not hasattr(ControlnetUtil, "preprocess_canny") or not hasattr(ControlnetUtil, "scale_image"):
-        raise AttributeError("ControlnetUtil missing expected helpers")
-except Exception:
-    from PIL import ImageFilter, ImageOps
+# --- ControlNet Import Logic ---
+# We check if imports are disabled (e.g. during tests or on Linux) to avoid
+# loading a Mock object or crashing on missing dependencies.
+_skip_controlnet = os.environ.get("MFLUX_COMFY_DISABLE_CONTROLNET_IMPORT") == "1"
+_skip_mflux = os.environ.get("MFLUX_COMFY_DISABLE_MFLUX_IMPORT") == "1"
+
+ControlnetUtil = None
+
+if not (_skip_controlnet or _skip_mflux):
+    try:
+        from mflux.controlnet.controlnet_util import ControlnetUtil  # type: ignore
+        # Verify the imported utility has the methods we need (handles partial mocks or old versions)
+        if not hasattr(ControlnetUtil, "preprocess_canny") or not hasattr(ControlnetUtil, "scale_image"):
+            ControlnetUtil = None
+    except ImportError:
+        pass
+
+# Fallback implementation using PIL if mflux is missing, disabled, or incompatible
+if ControlnetUtil is None:
+    from PIL import ImageFilter
 
     class ControlnetUtil:  # type: ignore
         @staticmethod
@@ -22,6 +37,36 @@ except Exception:
         @staticmethod
         def scale_image(h, w, img):
             return img.resize((w, h), Image.BICUBIC)
+
+def _save_tensor_to_temp(tensor, filename_prefix="mflux_temp", is_mask=False):
+    """
+    Converts a ComfyUI tensor (IMAGE or MASK) to a temporary PNG file
+    and returns the absolute path.
+    """
+    in_dir = folder_paths.get_input_directory()
+    fname = f"{filename_prefix}_{int(time.time()*1000)}_{uuid.uuid4().hex[:6]}.png"
+    out_path = os.path.join(in_dir, fname)
+
+    # Convert Tensor to Numpy
+    array = tensor.cpu().numpy()
+
+    if is_mask:
+        # Handle Mask: Expecting [H, W] or [1, H, W] -> convert to [H, W] 0..255
+        if array.ndim == 3:
+            array = array[0] # Take batch 0
+        array = np.clip(array * 255.0, 0, 255).astype(np.uint8)
+        img = Image.fromarray(array, mode='L')
+    else:
+        # Handle Image: Expecting [1, H, W, 3] -> convert to [H, W, 3] 0..255
+        if array.ndim == 4:
+            array = array[0]
+
+        # Clip and convert
+        array = np.clip(array * 255.0, 0, 255).astype(np.uint8)
+        img = Image.fromarray(array, mode='RGB')
+
+    img.save(out_path)
+    return out_path
 
 class MfluxImg2ImgPipeline:
     def __init__(self, image_path, image_strength):
@@ -75,7 +120,12 @@ class MfluxImg2Img:
     @classmethod
     def INPUT_TYPES(cls):
         input_dir = folder_paths.get_input_directory()
-        files = [f for f in os.listdir(input_dir) if os.path.isfile(os.path.join(input_dir, f))]
+        files = []
+        try:
+            if os.path.exists(input_dir):
+                files = [f for f in os.listdir(input_dir) if os.path.isfile(os.path.join(input_dir, f))]
+        except Exception:
+            pass
 
         return {
             "required": {
@@ -252,7 +302,11 @@ class MfluxLorasLoader:
     @classmethod
     def INPUT_TYPES(cls):
         lora_base_path = folder_paths.models_dir
-        loras_relative = ["None"] + folder_paths.get_filename_list("loras")
+        loras_relative = ["None"]
+        try:
+            loras_relative += folder_paths.get_filename_list("loras")
+        except Exception:
+            pass
 
         inputs = {
             "required": {
@@ -281,7 +335,7 @@ class MfluxLorasLoader:
             (os.path.join(lora_base_path, "loras", kwargs.get(f"Lora{i}")), kwargs.get(f"scale{i}"))
             for i in range(1, 4) if kwargs.get(f"Lora{i}") != "None"
         ]
-        
+
         if Loras is not None and isinstance(Loras, MfluxLorasPipeline):
             lora_paths = Loras.lora_paths
             lora_scales = Loras.lora_scales
@@ -302,7 +356,7 @@ class MfluxControlNetPipeline:
         self.control_image_path = control_image_path
         self.control_strength = control_strength
         self.save_canny = save_canny
- 
+
 
     def clear_cache(self):
         self.model_selection = None
@@ -314,16 +368,27 @@ class MfluxControlNetPipeline:
 class MfluxControlNetLoader:
     @classmethod
     def INPUT_TYPES(cls):
-        controlnet_models = [
-            "InstantX/FLUX.1-dev-Controlnet-Canny",
-        ]
+        # Use dynamic discovery from Core to support mflux runtime models
+        try:
+            from .Mflux_Core import get_available_controlnet_models
+            controlnet_models = get_available_controlnet_models()
+        except Exception:
+             controlnet_models = [
+                "InstantX/FLUX.1-dev-Controlnet-Canny",
+                "jasperai/Flux.1-dev-Controlnet-Upscaler",
+            ]
 
         input_dir = folder_paths.get_input_directory()
-        files = [f for f in os.listdir(input_dir) if os.path.isfile(os.path.join(input_dir, f))]
+        files = []
+        try:
+            if os.path.exists(input_dir):
+                files = [f for f in os.listdir(input_dir) if os.path.isfile(os.path.join(input_dir, f))]
+        except Exception:
+            pass
 
         return {
             "required": {
-                "model_selection": (controlnet_models, {"default": "InstantX/FLUX.1-dev-Controlnet-Canny", "tooltip": "Choose a ControlNet model. Canny works best for clear edges."}),
+                "model_selection": (controlnet_models, {"default": "InstantX/FLUX.1-dev-Controlnet-Canny", "tooltip": "Choose a ControlNet model. Canny=edges guidance, Upscaler=use original image to upscale."}),
                 "image": (sorted(files), {"image_upload": True, "tooltip": "Upload or select the image to extract edges from."}),
                 "control_strength": ("FLOAT", {"default": 0.5, "min": 0.0, "max": 1.0, "step": 0.01, "tooltip": "How strongly to apply edge guidance (0-1)."}),
                 "save_canny": ("BOOLEAN", {"default": False, "label_on": "Save preview", "label_off": "Don't save", "tooltip": "Save the detected edges image to outputs/MFlux for reference."}),
@@ -337,24 +402,35 @@ class MfluxControlNetLoader:
     FUNCTION = "load_and_select"
 
     def load_and_select(self, model_selection, image, control_strength, save_canny):
-        
+
         control_image_path = folder_paths.get_annotated_filepath(image)
         # Use oriented version for consistent sizing and preprocessing
         oriented_path, width, height = _make_oriented_copy(control_image_path)
+        is_upscaler = str(model_selection).lower().find("upscaler") != -1
 
         with Image.open(oriented_path) as img:
-            # Create a preview image that PreviewImage can handle reliably
-            canny_image = ControlnetUtil.preprocess_canny(img)
-            canny_image_np = np.array(canny_image).astype(np.float32)  # in 0..255
-            # Ensure 3-channel [H, W, 3]
-            if canny_image_np.ndim == 2:
-                canny_image_np = np.stack([canny_image_np] * 3, axis=-1)
-            elif canny_image_np.ndim == 3 and canny_image_np.shape[-1] == 1:
-                canny_image_np = np.repeat(canny_image_np, 3, axis=-1)
-            # Normalize to 0..1 float32 and add batch dim to match ComfyUI IMAGE tensor [B,H,W,C]
-            if canny_image_np.max() > 1.0:
-                canny_image_np = canny_image_np / 255.0
-            canny_preview = torch.from_numpy(canny_image_np.astype(np.float32)).unsqueeze(0)
+            if is_upscaler:
+                # For Upscaler, preview should be the original image (normalized), not canny edges
+                prev_np = np.array(ImageOps.exif_transpose(img)).astype(np.float32)
+                if prev_np.ndim == 2:
+                    prev_np = np.stack([prev_np] * 3, axis=-1)
+                if prev_np.max() > 1.0:
+                    prev_np = prev_np / 255.0
+                preview_tensor = torch.from_numpy(prev_np.astype(np.float32)).unsqueeze(0)
+                canny_image = None
+            else:
+                # Create a Canny preview image that PreviewImage can handle reliably
+                canny_image = ControlnetUtil.preprocess_canny(img)
+                canny_image_np = np.array(canny_image).astype(np.float32)  # in 0..255
+                # Ensure 3-channel [H, W, 3]
+                if canny_image_np.ndim == 2:
+                    canny_image_np = np.stack([canny_image_np] * 3, axis=-1)
+                elif canny_image_np.ndim == 3 and canny_image_np.shape[-1] == 1:
+                    canny_image_np = np.repeat(canny_image_np, 3, axis=-1)
+                # Normalize to 0..1 float32 and add batch dim to match ComfyUI IMAGE tensor [B,H,W,C]
+                if canny_image_np.max() > 1.0:
+                    canny_image_np = canny_image_np / 255.0
+                preview_tensor = torch.from_numpy(canny_image_np.astype(np.float32)).unsqueeze(0)
 
         # Optionally save canny preview to output directory for reference
         if save_canny:
@@ -363,12 +439,18 @@ class MfluxControlNetLoader:
                 mflux_output_folder = os.path.join(output_dir, "MFlux")
                 os.makedirs(mflux_output_folder, exist_ok=True)
                 base = os.path.splitext(os.path.basename(control_image_path))[0]
-                canny_file = os.path.join(mflux_output_folder, f"{base}_canny.png")
-                canny_image.convert("L").save(canny_file)
+                if is_upscaler:
+                    # Save a copy of the oriented source as preview
+                    prev_file = os.path.join(mflux_output_folder, f"{base}_preview.png")
+                    with Image.open(oriented_path) as _imprev:
+                        ImageOps.exif_transpose(_imprev).save(prev_file)
+                else:
+                    canny_file = os.path.join(mflux_output_folder, f"{base}_canny.png")
+                    canny_image.convert("L").save(canny_file)
             except Exception as e:
                 print(f"[MFlux-ComfyUI] Failed to save canny preview: {e}")
         # Return the oriented path so downstream consumers (if any) get the corrected image
-        return MfluxControlNetPipeline(model_selection, oriented_path, control_strength, save_canny), width, height, canny_preview
+        return MfluxControlNetPipeline(model_selection, oriented_path, control_strength, save_canny), width, height, preview_tensor
 
     @classmethod
     def IS_CHANGED(cls, model_selection, image, control_strength, save_canny):
@@ -382,6 +464,7 @@ class MfluxControlNetLoader:
 
         available_models = [
             "InstantX/FLUX.1-dev-Controlnet-Canny",
+            "jasperai/Flux.1-dev-Controlnet-Upscaler",
         ]
         if model_selection not in available_models:
             return f"Invalid model selection: {model_selection}"
@@ -401,3 +484,587 @@ class MfluxControlNetLoader:
             return "save_canny must be a boolean value"
 
         return True
+
+
+class MfluxUpscale:
+    @classmethod
+    def INPUT_TYPES(cls):
+        # Maintain compatibility with previously-saved graphs by keeping the legacy
+        # `image` combo and `upload` IMAGEUPLOAD widgets present (they are optional
+        # and ignored when using `input_image`). New workflows should prefer `input_image`.
+        input_dir = folder_paths.get_input_directory()
+        files = []
+        try:
+            if os.path.exists(input_dir):
+                files = [f for f in os.listdir(input_dir) if os.path.isfile(os.path.join(input_dir, f))]
+        except Exception:
+            files = []
+
+        return {
+            "required": {
+                "prompt": ("STRING", {"multiline": False, "default": "Upscale", "tooltip": "Optional prompt guiding the upscaler."}),
+                # Legacy file-selection (kept for compatibility with existing graphs).
+                "image": (sorted(files), {"image_upload": True, "tooltip": "(Compatibility) Select a source image file. Prefer providing `input_image` instead."}),
+                # Preferred modern input: ComfyUI IMAGE tensor
+                "input_image": ("IMAGE", {"tooltip": "ComfyUI IMAGE tensor to upscale (preferred)."}),
+                "scale": (["1.5","2","3","4"], {"default": "2", "tooltip": "Upscale multiplier applied to input image."}),
+                "control_strength": ("FLOAT", {"default": 0.6, "min": 0.0, "max": 1.0, "step": 0.01, "tooltip": "How strongly the Upscaler ControlNet follows the source image."}),
+                "steps": ("INT", {"default": 28, "min": 1, "max": 200, "tooltip": "Inference steps for the upscaler."}),
+                "seed": ("INT", {"default": -1, "min": -1, "max": 0xffffffffffffffff, "tooltip": "-1 = random"}),
+                "model": (["dev", "schnell"], {"default": "schnell", "tooltip": "Which base model alias to use for generation."}),
+                "quantize": (["None", "3", "4", "5", "6", "8"], {"default": "8", "tooltip": "Model quantization. 'None' uses full precision."}),
+            },
+            "optional": {
+                "Loras": ("MfluxLorasPipeline", {"tooltip": "Optional LoRAs to apply during upscaling."}),
+                "base_model": (["dev", "schnell"], {"default": "dev", "tooltip": "Base model when using third-party HF repos (unused for aliases)."}),
+                "low_ram": ("BOOLEAN", {"default": False, "label_on": "On", "label_off": "Off", "tooltip": "Reduce memory usage; may be slower."}),
+                "metadata": ("BOOLEAN", {"default": True, "label_on": "Save", "label_off": "Skip", "tooltip": "Save PNG + JSON metadata."}),
+                "vae_tiling": ("BOOLEAN", {"default": False, "label_on": "On", "label_off": "Off", "tooltip": "Enable VAE tiling to reduce peak memory for large upscales (may introduce seams)."}),
+                "vae_tiling_split": (["horizontal", "vertical"], {"default": "horizontal", "tooltip": "When vae_tiling is enabled, choose split orientation for tiling."}),
+            }
+        }
+
+    RETURN_TYPES = ("IMAGE",)
+    RETURN_NAMES = ("image",)
+    FUNCTION = "generate_upscale"
+    CATEGORY = "MFlux/Pro"
+
+    def generate_upscale(self, prompt, input_image=None, image=None, scale="2", control_strength=0.6, steps=28, seed=-1, model="schnell", quantize="8", Loras=None, base_model="dev", low_ram=False, metadata=True, vae_tiling=False, vae_tiling_split="horizontal"):
+        # Backwards-compatible signature: accept either a ComfyUI IMAGE tensor via `input_image`
+        # or a legacy file selector name via `image` (the latter resolves via folder_paths.get_annotated_filepath).
+        # Upscale accepts a ComfyUI IMAGE tensor as the source. Convert and save it into the input directory.
+        control_image_path = None
+        try:
+            in_dir = folder_paths.get_input_directory()
+            fname = f"from_tensor_{int(time.time()*1000)}_{uuid.uuid4().hex[:6]}.png"
+            out_path = os.path.join(in_dir, fname)
+
+            # If input_image is None, but a legacy `image` filename was provided, resolve it and
+            # use that file directly; skip conversion.
+            if input_image is None and image is not None:
+                control_image_path = folder_paths.get_annotated_filepath(image)
+            else:
+                # Support torch tensors and numpy arrays
+                np_img = None
+                try:
+                    if hasattr(input_image, 'detach') and hasattr(input_image, 'cpu'):
+                        np_img = input_image.detach().cpu().numpy()
+                    elif hasattr(input_image, 'numpy'):
+                        np_img = input_image.numpy()
+                    else:
+                        np_img = np.array(input_image)
+                except Exception:
+                    np_img = np.array(input_image)
+
+            # Typical ComfyUI IMAGE tensor shape: [B, H, W, C] with float32 in 0..1
+            if np_img is None:
+                raise ValueError("Unable to interpret IMAGE input")
+            if np_img.ndim == 4:
+                np_img = np_img[0]
+            # If channels-first [C,H,W], transpose to HWC
+            if np_img.ndim == 3 and (np_img.shape[0] == 1 or np_img.shape[0] == 3 or np_img.shape[0] == 4) and np_img.shape[2] not in (1,3,4):
+                np_img = np.transpose(np_img, (1, 2, 0))
+            # Normalize floats to 0..255
+            if np.issubdtype(np_img.dtype, np.floating):
+                np_img = np.clip(np_img, 0.0, 1.0)
+                np_img = (np_img * 255.0).astype(np.uint8)
+            elif not np.issubdtype(np_img.dtype, np.uint8):
+                np_img = np_img.astype(np.uint8)
+            # Ensure HWC with 3 channels
+            if np_img.ndim == 2:
+                np_img = np.stack([np_img] * 3, axis=-1)
+            if np_img.ndim == 3 and np_img.shape[2] == 1:
+                np_img = np.repeat(np_img, 3, axis=2)
+
+                Image.fromarray(np_img).save(out_path)
+                control_image_path = out_path
+        except Exception as e:
+            # If conversion failed and we have a legacy image name, try to resolve that instead.
+            if image is not None:
+                control_image_path = folder_paths.get_annotated_filepath(image)
+            else:
+                raise RuntimeError(f"[MFlux-ComfyUI] Failed to save IMAGE input for Upscale: {e}")
+
+        oriented_path, iw, ih = _make_oriented_copy(control_image_path)
+
+        # Determine target size and round to multiple of 8
+        try:
+            s = float(scale)
+        except Exception:
+            s = 2.0
+        tw = max(8, int(round(iw * s)))
+        th = max(8, int(round(ih * s)))
+        def _round8(v):
+            return max(8, int(round(v / 8) * 8))
+        tw, th = _round8(tw), _round8(th)
+
+        # Build a ControlNet pipeline object that points at the oriented source
+        upscaler_model = "jasperai/Flux.1-dev-Controlnet-Upscaler"
+        control_pipeline = MfluxControlNetPipeline(upscaler_model, oriented_path, control_strength, False)
+
+        # Create a simple image-like stub for legacy migration
+        class _ImgStub:
+            def __init__(self, path):
+                self.image_path = path
+                self.image_strength = 1.0
+
+        imgstub = _ImgStub(oriented_path)
+
+        # Dynamic import to avoid circular imports at module import time
+        try:
+            from .Mflux_Core import generate_image, get_lora_info
+        except Exception:
+            # Try relative import fallback
+            from Mflux_Comfy.Mflux_Core import generate_image, get_lora_info
+
+        lora_paths, lora_scales = get_lora_info(Loras)
+
+        generated = generate_image(
+            prompt=prompt,
+            model_string=model,
+            seed=seed,
+            width=tw,
+            height=th,
+            steps=steps,
+            guidance=3.5,
+            quantize=quantize,
+            metadata=metadata,
+            model_path="",
+            img2img_pipeline=imgstub,
+            loras_pipeline=Loras,
+            controlnet_pipeline=control_pipeline,
+            base_model_hint=base_model,
+            low_ram=low_ram,
+            vae_tiling=vae_tiling,
+            vae_tiling_split=vae_tiling_split,
+        )
+
+        # generate_image returns a tuple containing the IMAGE tensor(s)
+        return generated
+
+
+class MfluxFill:
+    """Inpaint/Fill node (scaffold) - forwards mask and image paths to core generate."""
+    @classmethod
+    def INPUT_TYPES(cls):
+        input_dir = folder_paths.get_input_directory()
+        files = []
+        try:
+            if os.path.exists(input_dir):
+                files = [f for f in os.listdir(input_dir) if os.path.isfile(os.path.join(input_dir, f))]
+        except Exception:
+            pass
+
+        return {
+            "required": {
+                "prompt": ("STRING", {"multiline": False, "default": "Fill", "tooltip": "Prompt for inpaint."}),
+                "image": (sorted(files), {"image_upload": True, "tooltip": "Source image to inpaint."}),
+                "masked_image": (sorted(files), {"image_upload": True, "tooltip": "Mask image (white=regen, black=keep)."}),
+                "steps": ("INT", {"default": 30, "min": 1, "max": 200}),
+                "seed": ("INT", {"default": -1, "min": -1, "max": 0xffffffffffffffff}),
+                "model": (("dev", "schnell"), {"default": "dev"}),
+            },
+            "optional": {
+                "quantize": (("None", "3", "4", "5", "6", "8"), {"default": "8"}),
+                "Loras": ("MfluxLorasPipeline", {"tooltip": "Optional LoRAs."}),
+                "base_model": (("dev", "schnell"), {"default": "dev"}),
+                "low_ram": ("BOOLEAN", {"default": False}),
+                "metadata": ("BOOLEAN", {"default": True}),
+            }
+        }
+
+    RETURN_TYPES = ("IMAGE",)
+    RETURN_NAMES = ("image",)
+    FUNCTION = "generate_fill"
+    CATEGORY = "MFlux/Pro"
+
+    def generate_fill(self, prompt, image, masked_image, steps, seed, model, quantize="8", Loras=None, base_model="dev", low_ram=False, metadata=True):
+        # Resolve annotated paths and orient
+        image_path = folder_paths.get_annotated_filepath(image)
+        masked_path = folder_paths.get_annotated_filepath(masked_image)
+        oriented_path, iw, ih = _make_oriented_copy(image_path)
+        masked_oriented, mw, mh = _make_oriented_copy(masked_path)
+
+        class _ImgStub:
+            def __init__(self, path):
+                self.image_path = path
+                self.image_strength = 1.0
+
+        imgstub = _ImgStub(oriented_path)
+
+        try:
+            from .Mflux_Core import generate_image, get_lora_info
+        except Exception:
+            from Mflux_Comfy.Mflux_Core import generate_image, get_lora_info
+
+        lora_paths, lora_scales = get_lora_info(Loras)
+
+        # Forward mask path as 'masked_image_path' for core
+        generated = generate_image(
+            prompt=prompt,
+            model_string=model,
+            seed=seed,
+            width=iw,
+            height=ih,
+            steps=steps,
+            guidance=3.5,
+            quantize=quantize,
+            metadata=metadata,
+            model_path="",
+            img2img_pipeline=imgstub,
+            masked_image_path=masked_oriented,
+            loras_pipeline=Loras,
+            base_model_hint=base_model,
+            low_ram=low_ram,
+        )
+
+        # Attempt to save metadata including masked path
+        try:
+            from .Mflux_Core import save_images_with_metadata, get_lora_info
+        except Exception:
+            from Mflux_Comfy.Mflux_Core import save_images_with_metadata, get_lora_info
+
+        lora_paths, lora_scales = get_lora_info(Loras)
+        extra = {
+            "masked_image_path": masked_oriented,
+        }
+        try:
+            save_images_with_metadata(generated, prompt, model, quantize, "", seed, ih, iw, steps, 3.5, image_path=oriented_path, image_strength=1.0, lora_paths=lora_paths, lora_scales=lora_scales, control_image_path=None, control_strength=None, control_model=None, filename_prefix="Mflux", full_prompt=None, extra_pnginfo=extra, base_model_hint=base_model, low_ram=low_ram)
+        except Exception:
+            # Non-fatal: metadata saving should not block generation
+            pass
+
+        return generated
+
+
+class MfluxDepth:
+    """Depth-conditioned generation scaffold."""
+    @classmethod
+    def INPUT_TYPES(cls):
+        input_dir = folder_paths.get_input_directory()
+        files = []
+        try:
+            if os.path.exists(input_dir):
+                files = [f for f in os.listdir(input_dir) if os.path.isfile(os.path.join(input_dir, f))]
+        except Exception:
+            pass
+
+        return {
+            "required": {
+                "prompt": ("STRING", {"multiline": False, "default": "Depth conditioned generation", "tooltip": "Prompt."}),
+                "image": (sorted(files), {"image_upload": True, "tooltip": "Source image (used when depth not provided)."}),
+                "steps": ("INT", {"default": 30, "min": 1, "max": 200}),
+                "seed": ("INT", {"default": -1, "min": -1, "max": 0xffffffffffffffff}),
+                "model": (("dev", "schnell"), {"default": "dev"}),
+            },
+            "optional": {
+                "depth_image": (sorted(files), {"image_upload": True, "tooltip": "External depth map to condition on (optional)."}),
+                "save_depth_map": ("BOOLEAN", {"default": False}),
+                "quantize": (("None", "3", "4", "5", "6", "8"), {"default": "8"}),
+                "Loras": ("MfluxLorasPipeline", {}),
+                "base_model": (("dev", "schnell"), {"default": "dev"}),
+                "low_ram": ("BOOLEAN", {"default": False}),
+                "metadata": ("BOOLEAN", {"default": True}),
+            }
+        }
+
+    RETURN_TYPES = ("IMAGE",)
+    RETURN_NAMES = ("image",)
+    FUNCTION = "generate_depth"
+    CATEGORY = "MFlux/Pro"
+
+    def generate_depth(self, prompt, image, steps, seed, model, depth_image=None, save_depth_map=False, quantize="8", Loras=None, base_model="dev", low_ram=False, metadata=True):
+        image_path = folder_paths.get_annotated_filepath(image)
+        oriented_path, iw, ih = _make_oriented_copy(image_path)
+        depth_path = None
+        if depth_image:
+            depth_path = folder_paths.get_annotated_filepath(depth_image)
+            depth_path, dw, dh = _make_oriented_copy(depth_path)
+
+        class _ImgStub:
+            def __init__(self, path):
+                self.image_path = path
+                self.image_strength = 1.0
+
+        imgstub = _ImgStub(oriented_path)
+
+        try:
+            from .Mflux_Core import generate_image, get_lora_info
+        except Exception:
+            from Mflux_Comfy.Mflux_Core import generate_image, get_lora_info
+
+        get_lora_info(Loras)
+
+        kwargs = dict(
+            prompt=prompt,
+            model_string=model,
+            seed=seed,
+            width=iw,
+            height=ih,
+            steps=steps,
+            guidance=3.5,
+            quantize=quantize,
+            metadata=metadata,
+            model_path="",
+            img2img_pipeline=imgstub,
+            loras_pipeline=Loras,
+            base_model_hint=base_model,
+            low_ram=low_ram,
+        )
+
+        if depth_path:
+            kwargs["depth_image_path"] = depth_path
+
+        generated = generate_image(**kwargs)
+
+        # Save metadata with optional depth path
+        try:
+            from .Mflux_Core import save_images_with_metadata, get_lora_info
+        except Exception:
+            from Mflux_Comfy.Mflux_Core import save_images_with_metadata, get_lora_info
+
+        lora_paths, lora_scales = get_lora_info(Loras)
+        extra = {
+            "depth_image_path": depth_path,
+        }
+        try:
+            save_images_with_metadata(generated, prompt, model, quantize, "", seed, ih, iw, steps, 3.5, image_path=oriented_path, image_strength=1.0, lora_paths=lora_paths, lora_scales=lora_scales, control_image_path=None, control_strength=None, control_model=None, filename_prefix="Mflux", full_prompt=None, extra_pnginfo=extra, base_model_hint=base_model, low_ram=low_ram)
+        except Exception:
+            pass
+
+        return generated
+
+
+class MfluxRedux:
+    """Redux node: combine multiple images as inputs for variation."""
+    @classmethod
+    def INPUT_TYPES(cls):
+        input_dir = folder_paths.get_input_directory()
+        files = []
+        try:
+            if os.path.exists(input_dir):
+                files = [f for f in os.listdir(input_dir) if os.path.isfile(os.path.join(input_dir, f))]
+        except Exception:
+            pass
+
+        return {
+            "required": {
+                "prompt": ("STRING", {"multiline": False, "default": "Redux mix", "tooltip": "Prompt."}),
+                "Redux1": (sorted(files), {"image_upload": True, "tooltip": "First input image."}),
+                "Redux2": (sorted(files), {"image_upload": True, "tooltip": "Second input image (optional)."}),
+                "steps": ("INT", {"default": 25, "min": 1, "max": 200}),
+                "seed": ("INT", {"default": -1, "min": -1, "max": 0xffffffffffffffff}),
+                "model": (("dev", "schnell"), {"default": "dev"}),
+            },
+            "optional": {
+                "strength1": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0}),
+                "strength2": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0}),
+                "quantize": (("None", "3", "4", "5", "6", "8"), {"default": "8"}),
+                "Loras": ("MfluxLorasPipeline", {}),
+                "base_model": (("dev", "schnell"), {"default": "dev"}),
+                "low_ram": ("BOOLEAN", {"default": False}),
+                "metadata": ("BOOLEAN", {"default": True}),
+            }
+        }
+
+    RETURN_TYPES = ("IMAGE",)
+    RETURN_NAMES = ("image",)
+    FUNCTION = "generate_redux"
+    CATEGORY = "MFlux/Pro"
+
+    def generate_redux(self, prompt, Redux1, Redux2=None, steps=25, seed=-1, model="dev", strength1=1.0, strength2=1.0, quantize="8", Loras=None, base_model="dev", low_ram=False, metadata=True):
+        paths = []
+        strengths = []
+        if Redux1:
+            paths.append(folder_paths.get_annotated_filepath(Redux1))
+            strengths.append(float(strength1))
+        if Redux2 and folder_paths.exists_annotated_filepath(Redux2):
+            paths.append(folder_paths.get_annotated_filepath(Redux2))
+            strengths.append(float(strength2))
+
+        # Convert to oriented copies to be safe
+        oriented_paths = []
+        for p in paths:
+            op, w, h = _make_oriented_copy(p)
+            oriented_paths.append(op)
+
+        class _ImgStub:
+            def __init__(self, path):
+                self.image_path = path
+                self.image_strength = 1.0
+
+        imgstub = _ImgStub(oriented_paths[0] if oriented_paths else "")
+
+        try:
+            from .Mflux_Core import generate_image, get_lora_info
+        except Exception:
+            from Mflux_Comfy.Mflux_Core import generate_image, get_lora_info
+
+        get_lora_info(Loras)
+
+        generated = generate_image(
+            prompt=prompt,
+            model_string=model,
+            seed=seed,
+            width=w, # Added width/height from last oriented copy
+            height=h,
+            steps=steps,
+            guidance=3.5,
+            quantize=quantize,
+            metadata=metadata,
+            model_path="",
+            img2img_pipeline=imgstub,
+            redux_image_paths=oriented_paths,
+            redux_image_strengths=strengths,
+            loras_pipeline=Loras,
+            base_model_hint=base_model,
+            low_ram=low_ram,
+        )
+
+        # Save metadata capturing redux inputs
+        try:
+            from .Mflux_Core import save_images_with_metadata, get_lora_info
+        except Exception:
+            from Mflux_Comfy.Mflux_Core import save_images_with_metadata, get_lora_info
+
+        lora_paths, lora_scales = get_lora_info(Loras)
+        extra = {
+            "redux_image_paths": oriented_paths,
+            "redux_image_strengths": strengths,
+        }
+        try:
+            # Use first oriented image size if available
+            if oriented_paths:
+                try:
+                    from PIL import Image as _PILImage
+                    with _PILImage.open(oriented_paths[0]) as _im:
+                        rw, rh = _im.size
+                except Exception:
+                    rw, rh = 0, 0
+            else:
+                rw, rh = 0, 0
+            save_images_with_metadata(generated, prompt, model, quantize, "", seed, rh or 0, rw or 0, steps, 3.5, image_path=imgstub.image_path, image_strength=1.0, lora_paths=lora_paths, lora_scales=lora_scales, control_image_path=None, control_strength=None, control_model=None, filename_prefix="Mflux", full_prompt=None, extra_pnginfo=extra, base_model_hint=base_model, low_ram=low_ram)
+        except Exception:
+            pass
+
+        return generated
+
+class MfluxZImageInpaint:
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                # This receives 'cropped_image' from the Crop node
+                "image": ("IMAGE", {"tooltip": "The source image (or crop) to inpaint."}),
+                # This receives 'cropped_mask' from the Crop node
+                "mask": ("MASK", {"tooltip": "The mask defining the area to regenerate."}),
+                "prompt": ("STRING", {"multiline": True, "dynamicPrompts": True, "default": "A woman smiling"}),
+                "model": ("STRING", {"default": "filipstrand/Z-Image-Turbo-mflux-4bit", "tooltip": "The Z-Image Turbo model path."}),
+                "steps": ("INT", {"default": 9, "min": 1, "max": 50, "tooltip": "Steps."}),
+                # ADDED: Essential for Z-Image Inpainting
+                "strength": ("FLOAT", {"default": 0.65, "min": 0.0, "max": 1.0, "step": 0.01, "tooltip": "Denoising strength. 0.6-0.7 is usually good for inpainting."}),
+                "seed": ("INT", {"default": -1, "min": -1, "max": 0xffffffffffffffff}),
+            },
+            "optional": {
+                # ADDED: Visualization Toggle
+                "output_noise_preview": ("BOOLEAN", {"default": False, "label_on": "true", "label_off": "false", "tooltip": "Visualize the noise mixed with the image based on strength. Helps tune how much structure the model sees."}),
+                "quantize": (["Auto", "None", "3", "4", "5", "6", "8"], {"default": "Auto"}),
+                "low_ram": ("BOOLEAN", {"default": False}),
+                "metadata": ("BOOLEAN", {"default": True}),
+                "Loras": ("MfluxLorasPipeline",),
+            }
+        }
+
+    RETURN_TYPES = ("IMAGE",)
+    FUNCTION = "generate"
+    CATEGORY = "MFlux/Pro"
+
+    def generate(self, image, mask, prompt, model, steps, strength, seed, output_noise_preview=False, quantize="Auto", low_ram=False, metadata=True, Loras=None):
+
+        # --- VISUALIZATION LOGIC START ---
+        # If the user wants to see the "Latent Input", we simulate it here.
+        # This helps tuning 'strength'.
+        if output_noise_preview:
+            # 1. Create random noise (simulating the diffusion noise)
+            noise = torch.randn_like(image)
+
+            # 2. Mix based on strength (Linear interpolation approximation)
+            # Strength 0.0 = Pure Image
+            # Strength 1.0 = Pure Noise
+            noisy_preview = (image * (1.0 - strength)) + (noise * strength)
+
+            # 3. Clip to valid image range
+            noisy_preview = torch.clamp(noisy_preview, 0.0, 1.0)
+
+            return (noisy_preview,)
+        # --- VISUALIZATION LOGIC END ---
+
+        # 1. Save the input (the cropped image) to a temp file for the backend
+        image_path = _save_tensor_to_temp(image, filename_prefix="z_src")
+
+        # 2. Orient image
+        oriented_image, w, h = _make_oriented_copy(image_path)
+
+        # 3. Create pipeline stub. We pass the 'strength' here.
+        # This tells the backend "Use this image as a starting point, but change it by X amount"
+        class _ImgStub:
+            def __init__(self, path, str_val):
+                self.image_path = path
+                self.image_strength = str_val
+
+        imgstub = _ImgStub(oriented_image, strength)
+
+        # 4. Import Core
+        try:
+            from .Mflux_Core import generate_image
+        except ImportError:
+            from Mflux_Comfy.Mflux_Core import generate_image
+
+        # 5. Run Generation (Standard Img2Img)
+        # CRITICAL: We DO NOT pass 'masked_image_path'. This prevents the crash.
+        # The model will generate a new version of the FULL crop.
+        generated_tuple = generate_image(
+            prompt=prompt,
+            model_string=model,
+            seed=seed,
+            width=w,
+            height=h,
+            steps=steps,
+            guidance=0.0,
+            quantize=quantize,
+            metadata=metadata,
+            img2img_pipeline=imgstub,
+            # masked_image_path=...  <-- Omitted to allow Z-Image to work
+            loras_pipeline=Loras,
+            base_model_hint="z-image-turbo",
+            low_ram=low_ram
+        )
+
+        generated_image = generated_tuple[0] # The model's output (The whole crop regenerated)
+
+        # 6. Apply the Mask (The Fix)
+        # We take the model's output and the original input.
+        # Wherever the mask is Black (0), we force the original pixels back.
+        # Wherever the mask is White (1), we keep the new Z-Image pixels.
+
+        # Prepare mask dimensions for broadcasting
+        # ComfyUI masks are usually [H, W] or [B, H, W]. We need [B, H, W, 1]
+        if mask.dim() == 2:
+            mask = mask.unsqueeze(0).unsqueeze(-1)
+        elif mask.dim() == 3:
+            mask = mask.unsqueeze(-1)
+
+        # Resize mask to match generated image dimensions if they differ slightly
+        # (This happens sometimes with rounding in Mflux resolution calculations)
+        if mask.shape[1] != generated_image.shape[1] or mask.shape[2] != generated_image.shape[2]:
+             import torch.nn.functional as F
+             mask_ch = mask.permute(0, 3, 1, 2) # [B, C, H, W]
+             mask_ch = F.interpolate(mask_ch, size=(generated_image.shape[1], generated_image.shape[2]), mode='bilinear', align_corners=False)
+             mask = mask_ch.permute(0, 2, 3, 1) # Back to [B, H, W, C]
+
+        # COMPOSITE:
+        # This ensures the borders of the crop remain perfectly identical to the original,
+        # allowing the "Inpaint Stitch" node to put it back into the main image seamlessly.
+        composited_image = generated_image * mask + image * (1.0 - mask)
+
+        return (composited_image,)

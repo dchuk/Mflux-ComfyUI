@@ -1,0 +1,74 @@
+import os
+import json
+import shutil
+import tempfile
+import numpy as np
+import torch
+from Mflux_Comfy.Mflux_Core import save_images_with_metadata
+
+
+def make_dummy_image_tensor():
+    # Create a small tensor (1,H,W,C) in float [0,1]
+    arr = np.zeros((1, 16, 16, 3), dtype=np.float32)
+    arr[0, 0:4, 0:4, :] = 1.0
+    # Keep HWC ordering so save_images_with_metadata can call .squeeze() -> (H,W,C)
+    t = torch.from_numpy(arr)
+    return (t,)
+
+
+def test_metadata_includes_vae_tiling(tmp_path, monkeypatch):
+    import folder_paths
+
+    tmp_out = tmp_path / "out"
+    tmp_out.mkdir()
+
+    monkeypatch.setattr(folder_paths, "get_output_directory", lambda: str(tmp_out))
+
+    # CRITICAL FIX: Mock get_save_image_path to return paths inside our tmp_out
+    # Signature: (full_output_folder, filename, counter, subfolder, filename_prefix)
+    def mock_get_save_image_path(filename_prefix, output_dir, h, w):
+        return (str(tmp_out), filename_prefix, 0, "", filename_prefix)
+
+    monkeypatch.setattr(folder_paths, "get_save_image_path", mock_get_save_image_path)
+
+    images = make_dummy_image_tensor()
+
+    # Call the save helper with vae_tiling flags set using keyword args
+    res = save_images_with_metadata(
+        images=images,
+        prompt="test",
+        model_alias="dev",
+        quantize="8",
+        quantize_effective="8-bit",
+        model_path="",
+        seed=42,
+        height=16,
+        width=16,
+        steps=10,
+        guidance=3.5,
+        lora_paths=[],
+        lora_scales=[],
+        image_path=None,
+        image_strength=None,
+        filename_prefix="TEST_MFLUX",
+        full_prompt=None,
+        extra_pnginfo=None,
+        base_model_hint="dev",
+        low_ram=False,
+        control_image_path=None,
+        control_strength=None,
+        control_model=None,
+        vae_tiling=True,
+        vae_tiling_split="vertical",
+    )
+
+    # Inspect the JSON file written
+    # Note: Mflux_Core appends "MFlux" subdir
+    outdir = tmp_out / "MFlux"
+    files = list(outdir.glob("TEST_MFLUX_*.json"))
+    assert files, "No metadata JSON produced"
+    # There should be at least one JSON, read the first one
+    with open(files[0], 'r') as f:
+        js = json.load(f)
+    assert js.get("vae_tiling") is True
+    assert js.get("vae_tiling_split") == "vertical"

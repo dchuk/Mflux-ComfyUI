@@ -1,9 +1,12 @@
 [project]
 name = "mflux-comfyui"
-description = "Simple use of [a/Mflux](https://github.com/filipstrand/mflux) in ComfyUI, suitable for users who are not familiar with terminal usage.\nNOTE: A MLX port of FLUX based on the Huggingface Diffusers implementation."
-version = "2.0.0"
-license = {file = "LICENSE"}
-dependencies = ["mflux>=0.10.0"]
+version = "2.1.0"
+description = "Mflux integration for ComfyUI"
+license = { file = "LICENSE" }
+dependencies = [
+    "mflux==0.13.1",
+    "huggingface_hub>=0.26.0",
+]
 
 [project.urls]
 Repository = "https://github.com/joonsoome/Mflux-ComfyUI"

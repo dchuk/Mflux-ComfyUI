@@ -18,7 +18,7 @@ This roadmap delivers a ComfyUI custom node package that wraps mflux 0.15.5 for 
 ## Phase Details
 
 ### Phase 1: Foundation
-**Goal**: Update mflux 0.13.1 → 0.15.5 and verify core utilities work
+**Goal**: Update mflux 0.13.1 -> 0.15.5 and verify core utilities work
 **Depends on**: Nothing (first phase)
 **Requirements**: INFRA-01, INFRA-02, INFRA-03
 **Success Criteria** (what must be TRUE):
@@ -27,10 +27,10 @@ This roadmap delivers a ComfyUI custom node package that wraps mflux 0.15.5 for 
   3. ComfyUI tensor converts back to PIL Image without data loss
   4. MLX cache clears successfully after calling memory utility
   5. Package imports without errors in Python 3.10+
-**Plans**: TBD
+**Plans:** 1 plan
 
 Plans:
-- [ ] 01-01: Update mflux dependency and fix breaking API changes
+- [ ] 01-01-PLAN.md - Update mflux dependency and create tensor/memory utilities
 
 ### Phase 2: Z-Image Turbo
 **Goal**: Fix existing Z-Image Turbo nodes to work with mflux 0.15.5 API
@@ -84,7 +84,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation | 0/1 | Not started | - |
+| 1. Foundation | 0/1 | Planned | - |
 | 2. Z-Image Turbo | 0/1 | Not started | - |
 | 3. SeedVR2 Upscaling | 0/1 | Not started | - |
 | 4. Polish | 0/2 | Not started | - |

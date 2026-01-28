@@ -57,10 +57,10 @@ Plans:
   3. User can select scale factor (1x-4x) and see proportional output size
   4. User can adjust softness parameter and see visual difference in output sharpness
   5. Upscaled image outputs as ComfyUI IMAGE type connectable to other nodes
-**Plans**: TBD
+**Plans:** 1 plan
 
 Plans:
-- [ ] 03-01: SeedVR2 loader and upscale nodes
+- [ ] 03-01-PLAN.md - Create SeedVR2 loader and upscaler nodes with platform gating
 
 ### Phase 4: Polish
 **Goal**: Production-ready UX with progress feedback and metadata preservation
@@ -86,7 +86,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4
 |-------|----------------|--------|-----------|
 | 1. Foundation | 1/1 | ✓ Complete | 2026-01-28 |
 | 2. Z-Image Turbo | 1/1 | ✓ Complete | 2026-01-28 |
-| 3. SeedVR2 Upscaling | 0/1 | Not started | - |
+| 3. SeedVR2 Upscaling | 0/1 | Planned | - |
 | 4. Polish | 0/2 | Not started | - |
 
 ---

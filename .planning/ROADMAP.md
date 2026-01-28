@@ -33,7 +33,7 @@ Plans:
 - [x] 01-01-PLAN.md - Update mflux dependency and create tensor/memory utilities
 
 ### Phase 2: Z-Image Turbo
-**Goal**: Fix existing Z-Image Turbo nodes to work with mflux 0.15.5 API
+**Goal**: Create dedicated Z-Image Turbo nodes with loader/sampler separation for clean workflows
 **Depends on**: Phase 1
 **Requirements**: INFRA-05, ZIMG-01, ZIMG-02, ZIMG-03, ZIMG-04, ZIMG-05
 **Success Criteria** (what must be TRUE):
@@ -42,10 +42,10 @@ Plans:
   3. User can enter text prompt and generate an image that appears in ComfyUI preview
   4. User can set seed, steps, width, height and see parameters affect output
   5. User can connect input image for img2img workflow with strength control
-**Plans**: TBD
+**Plans:** 1 plan
 
 Plans:
-- [ ] 02-01: Update Z-Image nodes for mflux 0.15.5 API
+- [ ] 02-01-PLAN.md - Create Z-Image loader, sampler, and img2img nodes with platform gating
 
 ### Phase 3: SeedVR2 Upscaling
 **Goal**: Users can upscale images using SeedVR2 diffusion upscaler
@@ -85,7 +85,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Foundation | 1/1 | ✓ Complete | 2026-01-28 |
-| 2. Z-Image Turbo | 0/1 | Not started | - |
+| 2. Z-Image Turbo | 0/1 | Planned | - |
 | 3. SeedVR2 Upscaling | 0/1 | Not started | - |
 | 4. Polish | 0/2 | Not started | - |
 

@@ -39,6 +39,18 @@ try:
             _ZIMAGE_NODES_AVAILABLE = False
     else:
         _ZIMAGE_NODES_AVAILABLE = False
+    # Conditionally import SeedVR2 nodes only on Apple Silicon
+    if _is_apple_silicon():
+        try:
+            from .Mflux_Comfy.Mflux_SeedVR2 import (
+                MfluxSeedVR2Loader,
+                MfluxSeedVR2Upscaler,
+            )
+            _SEEDVR2_NODES_AVAILABLE = True
+        except ImportError:
+            _SEEDVR2_NODES_AVAILABLE = False
+    else:
+        _SEEDVR2_NODES_AVAILABLE = False
 except Exception:
     # Fallback for environments where relative imports fail (e.g., direct execution during tests).
     import os
@@ -81,6 +93,18 @@ except Exception:
             _ZIMAGE_NODES_AVAILABLE = False
     else:
         _ZIMAGE_NODES_AVAILABLE = False
+    # Conditionally import SeedVR2 nodes only on Apple Silicon
+    if _is_apple_silicon():
+        try:
+            from Mflux_Comfy.Mflux_SeedVR2 import (
+                MfluxSeedVR2Loader,
+                MfluxSeedVR2Upscaler,
+            )
+            _SEEDVR2_NODES_AVAILABLE = True
+        except ImportError:
+            _SEEDVR2_NODES_AVAILABLE = False
+    else:
+        _SEEDVR2_NODES_AVAILABLE = False
 
 NODE_CLASS_MAPPINGS = {
     "QuickMfluxNode": QuickMfluxNode,
@@ -128,3 +152,10 @@ if _ZIMAGE_NODES_AVAILABLE:
     NODE_DISPLAY_NAME_MAPPINGS["MfluxZImageLoader"] = "MFlux Z-Image Loader"
     NODE_DISPLAY_NAME_MAPPINGS["MfluxZImageSampler"] = "MFlux Z-Image Sampler"
     NODE_DISPLAY_NAME_MAPPINGS["MfluxZImageImg2Img"] = "MFlux Z-Image Img2Img"
+
+# Conditionally add SeedVR2 nodes (Apple Silicon only)
+if _SEEDVR2_NODES_AVAILABLE:
+    NODE_CLASS_MAPPINGS["MfluxSeedVR2Loader"] = MfluxSeedVR2Loader
+    NODE_CLASS_MAPPINGS["MfluxSeedVR2Upscaler"] = MfluxSeedVR2Upscaler
+    NODE_DISPLAY_NAME_MAPPINGS["MfluxSeedVR2Loader"] = "MFlux SeedVR2 Loader"
+    NODE_DISPLAY_NAME_MAPPINGS["MfluxSeedVR2Upscaler"] = "MFlux SeedVR2 Upscaler"

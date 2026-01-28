@@ -10,7 +10,7 @@ This roadmap delivers a ComfyUI custom node package that wraps mflux 0.15.5 for 
 - Integer phases (1, 2, 3, 4): Planned milestone work
 - Decimal phases (2.1, 2.2): Urgent insertions (marked with INSERTED)
 
-- [ ] **Phase 1: Foundation** - Package structure, tensor conversion, memory management
+- [x] **Phase 1: Foundation** - Package structure, tensor conversion, memory management
 - [ ] **Phase 2: Z-Image Turbo** - First working text-to-image generation
 - [ ] **Phase 3: SeedVR2 Upscaling** - Diffusion-based image upscaling
 - [ ] **Phase 4: Polish** - Progress bars, metadata, packaging
@@ -30,7 +30,7 @@ This roadmap delivers a ComfyUI custom node package that wraps mflux 0.15.5 for 
 **Plans:** 1 plan
 
 Plans:
-- [ ] 01-01-PLAN.md - Update mflux dependency and create tensor/memory utilities
+- [x] 01-01-PLAN.md - Update mflux dependency and create tensor/memory utilities
 
 ### Phase 2: Z-Image Turbo
 **Goal**: Fix existing Z-Image Turbo nodes to work with mflux 0.15.5 API
@@ -84,11 +84,11 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation | 0/1 | Planned | - |
+| 1. Foundation | 1/1 | ✓ Complete | 2026-01-28 |
 | 2. Z-Image Turbo | 0/1 | Not started | - |
 | 3. SeedVR2 Upscaling | 0/1 | Not started | - |
 | 4. Polish | 0/2 | Not started | - |
 
 ---
 *Roadmap created: 2026-01-27*
-*Last updated: 2026-01-27*
+*Last updated: 2026-01-28*

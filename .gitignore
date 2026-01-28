@@ -1,11 +1,21 @@
 # Reference repos (cloned for development)
 .reference/
 
-# Python
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Thumbs.db
+
+# Python bytecode and caches
 __pycache__/
 *.py[cod]
 *$py.class
+
+# C extensions
 *.so
+
+# Distribution / packaging
 .Python
 build/
 develop-eggs/
@@ -22,22 +32,58 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+pip-wheel-metadata/
 
 # Virtual environments
 .venv/
 venv/
 ENV/
+env/
 
-# IDE
-.idea/
+# PyInstaller
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+
+# Type checkers
+.mypy_cache/
+.pytype/
+dmypy.json
+.dmypy.json
+
+# IDE / Editor settings
 .vscode/
+.idea/
+.history/
 *.swp
 *.swo
 *~
 
-# OS
-.DS_Store
-Thumbs.db
-
-# ComfyUI
+# Logs
 *.log
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Node (if any local tooling appears later)
+node_modules/
+
+# ComfyUI (avoid committing accidental local output dirs)
+/outputs/

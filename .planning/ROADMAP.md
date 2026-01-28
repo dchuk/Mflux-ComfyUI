@@ -18,21 +18,22 @@ This roadmap delivers a ComfyUI custom node package that wraps mflux 0.15.5 for 
 ## Phase Details
 
 ### Phase 1: Foundation
-**Goal**: Core utilities exist and are verified before any node is built
+**Goal**: Update mflux 0.13.1 → 0.15.5 and verify core utilities work
 **Depends on**: Nothing (first phase)
 **Requirements**: INFRA-01, INFRA-02, INFRA-03
 **Success Criteria** (what must be TRUE):
-  1. PIL Image converts to ComfyUI tensor with correct shape `[1, H, W, 3]` and range `[0, 1]`
-  2. ComfyUI tensor converts back to PIL Image without data loss
-  3. MLX cache clears successfully after calling memory utility
-  4. Package imports without errors in Python 3.10+
+  1. mflux 0.15.5 installs and imports without errors
+  2. PIL Image converts to ComfyUI tensor with correct shape `[1, H, W, 3]` and range `[0, 1]`
+  3. ComfyUI tensor converts back to PIL Image without data loss
+  4. MLX cache clears successfully after calling memory utility
+  5. Package imports without errors in Python 3.10+
 **Plans**: TBD
 
 Plans:
-- [ ] 01-01: Package scaffold and tensor conversion utilities
+- [ ] 01-01: Update mflux dependency and fix breaking API changes
 
 ### Phase 2: Z-Image Turbo
-**Goal**: Users can generate images from text prompts using Z-Image Turbo in ComfyUI
+**Goal**: Fix existing Z-Image Turbo nodes to work with mflux 0.15.5 API
 **Depends on**: Phase 1
 **Requirements**: INFRA-05, ZIMG-01, ZIMG-02, ZIMG-03, ZIMG-04, ZIMG-05
 **Success Criteria** (what must be TRUE):
@@ -44,7 +45,7 @@ Plans:
 **Plans**: TBD
 
 Plans:
-- [ ] 02-01: Z-Image loader and generation nodes
+- [ ] 02-01: Update Z-Image nodes for mflux 0.15.5 API
 
 ### Phase 3: SeedVR2 Upscaling
 **Goal**: Users can upscale images using SeedVR2 diffusion upscaler

@@ -61,9 +61,9 @@ Mac users can generate images with the latest mflux models (Z-Image Turbo, Flux2
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| Start from PR #1 as base | Already has multi-model node architecture and Z-Image support | — Pending |
+| Start from PR #1 as base | Already has multi-model node architecture and Z-Image support | ✓ Good — merged into fork |
 | Target mflux 0.15.5 (not just 0.13.1) | Need Flux2 Klein and SeedVR2 which require 0.14.0+ | — Pending |
 | Mac-only focus | MLX is the differentiator; CUDA users have other options | — Pending |
 
 ---
-*Last updated: 2026-01-27 after initialization*
+*Last updated: 2026-01-27 after fork setup*

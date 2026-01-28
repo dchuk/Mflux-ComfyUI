@@ -12,7 +12,7 @@ This roadmap delivers a ComfyUI custom node package that wraps mflux 0.15.5 for 
 
 - [x] **Phase 1: Foundation** - Package structure, tensor conversion, memory management
 - [x] **Phase 2: Z-Image Turbo** - First working text-to-image generation
-- [ ] **Phase 3: SeedVR2 Upscaling** - Diffusion-based image upscaling
+- [x] **Phase 3: SeedVR2 Upscaling** - Diffusion-based image upscaling
 - [ ] **Phase 4: Polish** - Progress bars, metadata, packaging
 
 ## Phase Details
@@ -60,7 +60,7 @@ Plans:
 **Plans:** 1 plan
 
 Plans:
-- [ ] 03-01-PLAN.md - Create SeedVR2 loader and upscaler nodes with platform gating
+- [x] 03-01-PLAN.md - Create SeedVR2 loader and upscaler nodes with platform gating
 
 ### Phase 4: Polish
 **Goal**: Production-ready UX with progress feedback and metadata preservation
@@ -86,7 +86,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4
 |-------|----------------|--------|-----------|
 | 1. Foundation | 1/1 | ✓ Complete | 2026-01-28 |
 | 2. Z-Image Turbo | 1/1 | ✓ Complete | 2026-01-28 |
-| 3. SeedVR2 Upscaling | 0/1 | Planned | - |
+| 3. SeedVR2 Upscaling | 1/1 | ✓ Complete | 2026-01-28 |
 | 4. Polish | 0/2 | Not started | - |
 
 ---

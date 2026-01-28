@@ -25,11 +25,11 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### SeedVR2 Upscaling
 
-- [ ] **UPSC-01**: User can load SeedVR2 upscaling model with quantization selection
-- [ ] **UPSC-02**: User can upscale ComfyUI IMAGE input (not file path)
-- [ ] **UPSC-03**: User can specify scale factor (1x-4x) and seed
-- [ ] **UPSC-04**: User can adjust softness parameter for output sharpness
-- [ ] **UPSC-05**: Upscaled image outputs as standard ComfyUI IMAGE type
+- [x] **UPSC-01**: User can load SeedVR2 upscaling model with quantization selection
+- [x] **UPSC-02**: User can upscale ComfyUI IMAGE input (not file path)
+- [x] **UPSC-03**: User can specify scale factor (1x-4x) and seed
+- [x] **UPSC-04**: User can adjust softness parameter for output sharpness
+- [x] **UPSC-05**: Upscaled image outputs as standard ComfyUI IMAGE type
 
 ### Polish
 
@@ -82,11 +82,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | ZIMG-03 | Phase 2 | Complete |
 | ZIMG-04 | Phase 2 | Complete |
 | ZIMG-05 | Phase 2 | Complete |
-| UPSC-01 | Phase 3 | Pending |
-| UPSC-02 | Phase 3 | Pending |
-| UPSC-03 | Phase 3 | Pending |
-| UPSC-04 | Phase 3 | Pending |
-| UPSC-05 | Phase 3 | Pending |
+| UPSC-01 | Phase 3 | Complete |
+| UPSC-02 | Phase 3 | Complete |
+| UPSC-03 | Phase 3 | Complete |
+| UPSC-04 | Phase 3 | Complete |
+| UPSC-05 | Phase 3 | Complete |
 | PLSH-01 | Phase 4 | Pending |
 | PLSH-02 | Phase 4 | Pending |
 | PLSH-03 | Phase 4 | Pending |
@@ -99,4 +99,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-01-27*
-*Last updated: 2026-01-28 after Phase 2 completion*
+*Last updated: 2026-01-28 after Phase 3 completion*

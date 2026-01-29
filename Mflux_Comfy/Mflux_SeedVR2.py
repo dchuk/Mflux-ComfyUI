@@ -110,9 +110,9 @@ class MfluxSeedVR2Loader:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "quantize": (["4", "8", "None"], {
-                    "default": "4",
-                    "tooltip": "4-bit: Fastest, lowest memory. 8-bit: Better quality. None: Full precision."
+                "quantize": (["None", "4", "8"], {
+                    "default": "None",
+                    "tooltip": "None: Full precision (recommended). 4-bit: Lowest memory. 8-bit: Balance."
                 }),
             },
             "optional": {
@@ -148,13 +148,16 @@ class MfluxSeedVR2Loader:
             # Clear old cache entries
             _seedvr2_cache.clear()
 
-            print(f"[MFlux-SeedVR2] Loading model (Quantize: {quantize})")
+            # Get model config for logging
+            model_config = ModelConfig.seedvr2_3b()
+            print(f"[MFlux-SeedVR2] Loading model from: {model_config.model_name}")
+            print(f"[MFlux-SeedVR2] Quantization: {quantize}")
 
-            # Load model
+            # Load model - mflux will download from HuggingFace if not cached
             instance = SeedVR2(
                 quantize=q_val,
                 model_path=None,
-                model_config=ModelConfig.seedvr2_3b(),
+                model_config=model_config,
             )
 
             _seedvr2_cache[cache_key] = instance
@@ -187,17 +190,17 @@ class MfluxSeedVR2Upscaler:
                 }),
                 "scale_mode": (["Multiplier", "Longest Side"], {
                     "default": "Multiplier",
-                    "tooltip": "How to specify output size"
+                    "tooltip": "Choose sizing method. Only the selected mode's parameter is used."
                 }),
                 "multiplier": (["1x", "2x", "4x"], {
                     "default": "4x",
-                    "tooltip": "Scale multiplier (when mode is Multiplier)"
+                    "tooltip": "Scale factor (only used when scale_mode=Multiplier)"
                 }),
                 "longest_side": ("INT", {
                     "default": 2048,
                     "min": 64,
                     "max": 8192,
-                    "tooltip": "Target pixels for longest edge (when mode is Longest Side)"
+                    "tooltip": "Target pixels for longest edge (only used when scale_mode=Longest Side)"
                 }),
                 "softness": ("FLOAT", {
                     "default": 0.0,
